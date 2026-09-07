@@ -1,0 +1,11 @@
+<svg width="360" height="92" viewBox="0 0 360 92" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(4 4)">
+    <path d="M10 10H34C55 10 70 24 70 45" stroke="#12A66F" stroke-width="9" stroke-linecap="round"/>
+    <path d="M10 26H31C44 26 53 34 53 46" stroke="#7BE0B7" stroke-width="9" stroke-linecap="round"/>
+    <path d="M10 42H28" stroke="#12A66F" stroke-width="9" stroke-linecap="round"/>
+    <rect x="6" y="36" width="16" height="16" rx="3" fill="#12A66F"/>
+    <path d="M38 50L70 78" stroke="#12A66F" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <text x="96" y="60" fill="#09271D" font-family="Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="-2">RiskOS</text>
+  <text x="264" y="34" fill="#09271D" font-family="Arial, sans-serif" font-size="15" font-weight="600">folio</text>
+</svg>

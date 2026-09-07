@@ -1,0 +1,170 @@
+[
+  {
+    "address": "SP2ZM1KNQNS96RM1MAJTZV7WE7F38GFGRND4E80DW",
+    "scenario": "multi_protocol_zest_debt_plus_bitflow_lp_in_range",
+    "label": "Zest borrow (zsBTC/USDCx) + Bitflow sBTC-USDCx LP in-range + wallet",
+    "protocols": ["zest", "bitflow", "stacks"],
+    "analysisFocus": ["liquidation", "liquidity", "portfolio_aggregation", "protect_candidate"]
+  },
+  {
+    "address": "SP1BXRXA0Z67MB6G31FP1R52ZX5GQTZ5008KZG77A",
+    "scenario": "bitflow_lp_whale_in_range_healthy",
+    "label": "Large Bitflow DLMM LP in-range; idle wallet assets; healthy posture",
+    "protocols": ["bitflow", "stacks"],
+    "analysisFocus": ["liquidity", "deployed_vs_idle", "healthy_classification"]
+  },
+  {
+    "address": "SP3XZXY4TMXV09EXHRZSM3KF7054FYN8FX9KY1JAP",
+    "scenario": "bitflow_lp_small_in_range",
+    "label": "Small Bitflow LP in-range (~$5k) — size floor / chart scaling",
+    "protocols": ["bitflow", "stacks"],
+    "analysisFocus": ["liquidity", "small_position_ux"]
+  },
+  {
+    "address": "SP23PF43T06AH0BA2XD7XYKH16GECH242S238WK60",
+    "scenario": "bitflow_lp_with_unpriced_wallet_dust",
+    "label": "Bitflow LP in-range plus unsupported/unpriced wallet tokens",
+    "protocols": ["bitflow", "stacks"],
+    "analysisFocus": ["liquidity", "partial_valuation", "unsupported", "oracle"]
+  },
+  {
+    "address": "SPRF37X3538964DEV66GHVAC7PEGE6PBGX4GDP72",
+    "scenario": "bitflow_former_interactor_no_active_lp",
+    "label": "Recent Bitflow pool txs but no active LP — closed/exited position",
+    "protocols": ["stacks"],
+    "analysisFocus": ["negative_discovery", "stale_tx_vs_position"]
+  },
+  {
+    "address": "SP1E0FWX3Q5PRZRHW9A205YBXMRX7YYS14CDN8RA7",
+    "scenario": "zest_critical_liquidation_sbtc_usdcx",
+    "label": "Zest zsBTC collateral / USDCx debt — critical liquidation score",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "critical_classification", "protect_repay"]
+  },
+  {
+    "address": "SP2R8C36A8KVBBWYC4ASD6V36S2E9VJ0FXWV2T4CP",
+    "scenario": "zest_high_risk_sbtc_usdcx_cleanish_wallet",
+    "label": "Zest zsBTC→USDCx debt with moderate wallet noise",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "high-risk", "protect_repay"]
+  },
+  {
+    "address": "SP1GWNW9GKX5WT7GPPB8S0BKXD257VGFYY24X0C74",
+    "scenario": "zest_debt_usdh_stable_variant",
+    "label": "Zest zsBTC collateral borrowed USDH (not USDCx)",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "alternate_debt_asset", "pricing"]
+  },
+  {
+    "address": "SP1EKDMMG508FY96RSEQ1EFGGZ6J8T8DCDPAM12HS",
+    "scenario": "zest_debt_stx_collateral_usdcx",
+    "label": "Zest zSTX collateral / USDCx debt — non-BTC collateral path",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "stx_collateral", "partial_valuation"]
+  },
+  {
+    "address": "SP2PKX3NAER3T40ECAYAVZESCGA42B6BP50K6ENKM",
+    "scenario": "zest_debt_ststxbtc_collateral",
+    "label": "Zest zstSTXbtc collateral / USDCx debt — LST-BTC linked",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "lst_collateral", "btc_linked"]
+  },
+  {
+    "address": "SPJN63YWJP48HDQP24HBPW3HAXTQHCNSQKKEQ8CR",
+    "scenario": "zest_multi_leg_debt_ststx",
+    "label": "Zest multi-leg account borrowing stSTX against zsBTC",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["multi_leg", "liquidation", "non_stable_debt"]
+  },
+  {
+    "address": "SPCE87V29VDPEAS925YMV2VG3CMBHY0BXKB08NA4",
+    "scenario": "zest_multi_leg_debt_sbtc",
+    "label": "Zest multi-leg account borrowing sBTC against zsBTC",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["multi_leg", "liquidation", "same_asset_family_debt"]
+  },
+  {
+    "address": "SP2CCCQP1WN3FG67K3V4S85JG9SRZN2KKRJ3M3GNG",
+    "scenario": "zest_multi_leg_plus_extreme_wallet_noise",
+    "label": "Multi-leg Zest USDCx debt + many unpriced wallet tokens (stress totals)",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["multi_leg", "partial_valuation", "unsupported", "oracle", "net_worth_stress"]
+  },
+  {
+    "address": "SP39DC776TVRWSPSXNXCCM80APY6EBV4J1Y3HAZYJ",
+    "scenario": "zest_multi_leg_usdcx_mid_size",
+    "label": "Multi-leg Zest zsBTC/USDCx with mid wallet footprint",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["multi_leg", "liquidation"]
+  },
+  {
+    "address": "SP288D9CSDS3C10Z5C5J0R2ZE51HKZ35W4XWXKW7H",
+    "scenario": "zest_supply_only_zststx_no_debt",
+    "label": "Zest supply-only (zstSTX) — no liquidation path",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["supply", "healthy", "no_protect_debt"]
+  },
+  {
+    "address": "SP22H4KA8XSCKTT39J8JJSJ8MYMGJW1WV21X3634C",
+    "scenario": "zest_supply_only_zsbtc_plus_dust",
+    "label": "Zest zsBTC supply + unsupported wallet dust",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["supply", "partial_valuation", "unsupported"]
+  },
+  {
+    "address": "SP1273QGV0M6K7982ZEWPZKB06RHRXM3NM7G4X0CS",
+    "scenario": "zest_supply_only_minimal",
+    "label": "Minimal Zest supply + wallet — small healthy account",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["supply", "minimal_surface"]
+  },
+  {
+    "address": "SP31A0B5K60KHWM3S3JD0B47TG3R43PT1KRV7V53B",
+    "scenario": "zest_debt_plus_high_token_count_wallet",
+    "label": "Active Zest USDCx debt buried in 100+ wallet tokens",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "high_token_count", "unsupported", "ui_scale"]
+  },
+  {
+    "address": "SP3VJR6HPGKH5VBMNHRXHPQXYH3P4BWV696WHF594",
+    "scenario": "zest_debt_large_net_worth_partial_pricing",
+    "label": "Large Zest borrower with many unpriced legs — fail-closed pricing stress",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "partial_valuation", "oracle", "headline_integrity"]
+  },
+  {
+    "address": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR",
+    "scenario": "wallet_only_high_token_count_no_defi",
+    "label": "118 wallet tokens, no Zest/Bitflow — unsupported/oracle flood",
+    "protocols": ["stacks"],
+    "analysisFocus": ["unsupported", "oracle", "partial_valuation", "noise_filter"]
+  },
+  {
+    "address": "SP000000000000000000002Q6VF78",
+    "scenario": "burn_address_extreme_token_spam",
+    "label": "Burn/system address with 500+ wallet dust positions",
+    "protocols": ["stacks"],
+    "analysisFocus": ["extremal_scale", "unsupported", "performance"]
+  },
+  {
+    "address": "SP3K8BC0PPEVCV7NZ6AGAXWG5XA0Z0Y1WXA9YJ7ZQ",
+    "scenario": "near_empty_zero_net_worth",
+    "label": "Single wallet balance, $0 net — empty/near-empty UX",
+    "protocols": ["stacks"],
+    "analysisFocus": ["empty_state", "zero_net_worth"]
+  },
+  {
+    "address": "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE",
+    "scenario": "wallet_dust_mostly_unpriced",
+    "label": "Many dust tokens, near-zero valued net worth",
+    "protocols": ["stacks"],
+    "analysisFocus": ["partial_valuation", "unsupported", "dust"]
+  },
+  {
+    "address": "SP2Y8413YYHHEY7XVV9Z9NSHJCN5Y4AVPA70P11FJ",
+    "scenario": "zest_debt_mid_size_sbtc_usdcx",
+    "label": "Mid-size Zest zsBTC/USDCx borrower without extreme wallet noise",
+    "protocols": ["zest", "stacks"],
+    "analysisFocus": ["liquidation", "protect_repay", "baseline_borrower"]
+  }
+]

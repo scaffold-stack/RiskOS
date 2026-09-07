@@ -1,0 +1,715 @@
+openapi: 3.1.0
+info:
+  title: RiskOS API
+  version: 0.2.0
+  description: Provenance-aware Bitcoin finance positions, deterministic risk, wallet-owned alerts, and guarded protective intents.
+servers:
+  - url: https://api.riskos.example
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health and active safety mode
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, dataMode, execution, time]
+                properties:
+                  status: { const: ok }
+                  dataMode: { enum: [fixture, live] }
+                  execution: { type: string }
+                  time: { type: string, format: date-time }
+  /v1/address/{address}/positions:
+    get:
+      operationId: getAddressPositions
+      parameters:
+        - $ref: "#/components/parameters/Address"
+      responses:
+        "200":
+          description: Normalized positions with provenance and confidence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionEnvelope"
+        "400": { $ref: "#/components/responses/Problem" }
+  /v1/auth/challenge:
+    post:
+      operationId: createWalletChallenge
+      description: Creates a five-minute, domain-bound, non-transaction wallet ownership challenge.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties: { address: { type: string } }
+      responses:
+        "201":
+          description: One-time challenge
+          content: { application/json: { schema: { $ref: "#/components/schemas/WalletChallenge" } } }
+        "400": { $ref: "#/components/responses/Problem" }
+  /v1/auth/verify:
+    post:
+      operationId: verifyWalletChallenge
+      description: Verifies the Stacks message signature and issues a short-lived httpOnly session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, address, publicKey, signature]
+              properties:
+                challengeId: { type: string }
+                address: { type: string }
+                publicKey: { type: string }
+                signature: { type: string }
+      responses:
+        "200": { description: Authenticated wallet session }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/auth/session:
+    get:
+      operationId: getWalletSession
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { description: Current wallet session }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/auth/logout:
+    post:
+      operationId: logoutWalletSession
+      security: [{ sessionCookie: [] }]
+      responses:
+        "204": { description: Session revoked and cookie expired }
+  /v1/alerts:
+    get:
+      operationId: getAlerts
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Wallet-owned rules and deduplicated occurrences
+          content: { application/json: { schema: { $ref: "#/components/schemas/AlertsResponse" } } }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/alerts/rules:
+    post:
+      operationId: createAlertRule
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, categories, minimumSeverity]
+              properties:
+                name: { type: string, maxLength: 80 }
+                categories: { type: array, minItems: 1, items: { type: string } }
+                minimumSeverity: { enum: [info, low, medium, high, critical] }
+      responses:
+        "201": { description: Rule saved and evaluated immediately }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/address/{address}/risk:
+    get:
+      operationId: getAddressRisk
+      parameters:
+        - $ref: "#/components/parameters/Address"
+      responses:
+        "200":
+          description: Current deterministic risk findings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [address, asOf, risks, warnings]
+                properties:
+                  address: { type: string }
+                  asOf: { $ref: "#/components/schemas/BlockReference" }
+                  risks:
+                    type: array
+                    items: { $ref: "#/components/schemas/RiskFinding" }
+                  warnings:
+                    type: array
+                    items: { type: string }
+        "400": { $ref: "#/components/responses/Problem" }
+  /v1/address/{address}/portfolio:
+    get:
+      operationId: getAddressPortfolio
+      description: Meaning-first portfolio summary answering where capital sits, what can go wrong, and the safest next action.
+      parameters:
+        - $ref: "#/components/parameters/Address"
+      responses:
+        "200":
+          description: Aggregated portfolio value, allocations, risk drivers, and BTC stress scenarios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioSummary"
+        "400": { $ref: "#/components/responses/Problem" }
+  /v1/address/{address}/sbtc-operations:
+    get:
+      operationId: getAddressSbtcOperations
+      description: Reconciles Emily workflow status with canonical sBTC registry events and Bitcoin transaction confirmation evidence. Emily alone can never establish completion.
+      parameters:
+        - $ref: "#/components/parameters/Address"
+      responses:
+        "200":
+          description: Evidence-backed deposit and withdrawal lifecycle states
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [address, operations]
+                properties:
+                  address: { type: string }
+                  operations:
+                    type: array
+                    items: { $ref: "#/components/schemas/SbtcOperation" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "502": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /v1/system/health:
+    get:
+      operationId: getSystemHealth
+      responses:
+        "200":
+          description: Canonical data-store and dependency health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, sources, warnings]
+                properties:
+                  status: { enum: [available, degraded] }
+                  sources: { type: array, items: { type: object } }
+                  warnings: { type: array, items: { type: string } }
+  /v1/ingest/chainhooks/stacks:
+    post:
+      operationId: ingestStacksChainhook
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: x-chainhook-delivery
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [apply, rollback]
+              properties:
+                apply: { type: array, items: { type: object } }
+                rollback: { type: array, items: { type: object } }
+                chainhook: { type: object }
+      responses:
+        "202": { description: Delivery persisted and applied }
+        "200": { description: Duplicate delivery acknowledged without reprocessing }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/operations/reconcile/stacks/{height}:
+    post:
+      operationId: reconcileStacksBlock
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: height
+          in: path
+          required: true
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200": { description: Canonical hashes agree or local block is pending }
+        "409": { description: Canonical hash disagreement }
+        "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /v1/operations/registry/activate:
+    post:
+      operationId: activateSignedRegistry
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "202": { description: Signed registry verified and activated }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /v1/operations/snapshots/{address}:
+    post:
+      operationId: persistCanonicalPositionSnapshots
+      description: Persists only positions whose block provenance equals the current canonical Chainhook tip and binds each snapshot to that tip's index-block hash.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Address"
+      responses:
+        "202": { description: Eligible snapshots persisted; ineligible position IDs are returned as skipped }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+  /v1/actions/plan:
+    post:
+      operationId: planProtectiveAction
+      description: Publicly calculates a stateless, integrity-hashed protection preview from current address evidence. It is not saved and cannot be requested from a wallet until ownership is authenticated and the plan is recalculated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [address, positionId, action, amountAtomic]
+              properties:
+                address: { type: string }
+                positionId: { type: string }
+                action: { const: repay }
+                amountAtomic: { type: string, pattern: "^[0-9]+$" }
+      responses:
+        "200":
+          description: A stateless preview with simulation results; contract-call arguments, post-conditions, and executable integrity hash are withheld
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TransactionIntent" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/actions/intents:
+    post:
+      operationId: saveProtectiveIntent
+      description: Verifies address ownership, re-reads current evidence, recalculates the plan, and persists the resulting intent for a subsequent wallet request.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [address, positionId, action, amountAtomic]
+              properties:
+                address: { type: string }
+                positionId: { type: string }
+                action: { const: repay }
+                amountAtomic: { type: string, pattern: "^[0-9]+$" }
+      responses:
+        "201":
+          description: Fresh authenticated intent persisted for wallet-request validation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TransactionIntent" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/actions/{intentId}/wallet-request:
+    post:
+      operationId: createWalletRequest
+      description: Revalidates intent integrity, expiry, simulation, ownership, and canonical state drift. Mainnet returns no executable payload during shadow mode.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Guarded wallet request or non-executable shadow result }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/actions/{intentId}/submissions:
+    post:
+      operationId: recordWalletSubmission
+      description: Records a wallet-returned testnet transaction ID for tracking. Mainnet submissions are rejected during shadow mode.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [txid]
+              properties: { txid: { type: string, pattern: "^0x[a-fA-F0-9]{64}$" } }
+      responses:
+        "202": { description: Submission accepted for reconciliation }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: riskos_session
+  parameters:
+    Address:
+      name: address
+      in: path
+      required: true
+      schema: { type: string, pattern: "^(SP|SM|ST|SN)[A-Z0-9]{20,50}$" }
+  responses:
+    Problem:
+      description: RFC 9457-style problem response
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    BlockReference:
+      type: object
+      required: [stacksBlockHeight, bitcoinBlockHeight, observedAt]
+      properties:
+        stacksBlockHeight: { type: integer, minimum: 0 }
+        bitcoinBlockHeight: { type: integer, minimum: 0 }
+        observedAt: { type: string, format: date-time }
+    Provenance:
+      type: object
+      required: [source, observedAt]
+      properties:
+        source: { enum: [chainhook, contract-read, stacks-api, bitcoin-rpc, oracle, quote, fixture] }
+        blockHeight: { type: integer, minimum: 0 }
+        transactionId: { type: string }
+        observedAt: { type: string, format: date-time }
+    Confidence:
+      type: object
+      required: [state, score, reasons]
+      properties:
+        state: { enum: [verified, estimated, degraded, unsupported] }
+        score: { type: number, minimum: 0, maximum: 1 }
+        reasons: { type: array, items: { type: string } }
+    AssetAmount:
+      type: object
+      required: [asset, amountAtomic, decimals, valueUsd]
+      properties:
+        asset: { type: string }
+        amountAtomic: { type: string, pattern: "^[0-9]+$" }
+        decimals: { type: integer, minimum: 0 }
+        valueUsd: { type: [string, "null"], pattern: "^-?[0-9]+(\\.[0-9]+)?$" }
+    EarningsEvidence:
+      type: object
+      description: Annualized yield evidence. Earned-to-date remains null until a principal or cost-basis checkpoint is reconciled.
+      required: [annualizedRateBps, rateKind, earnedToDateUsd, observedAtBlock, meaning]
+      properties:
+        annualizedRateBps: { type: [integer, "null"], minimum: 0 }
+        rateKind: { enum: [supply-apr, provider-apy] }
+        earnedToDateUsd: { type: [string, "null"], pattern: "^-?[0-9]+(\\.[0-9]+)?$" }
+        observedAtBlock: { type: integer, minimum: 0 }
+        meaning: { type: string }
+    PositionEnvelope:
+      type: object
+      required: [address, asOf, positions, warnings]
+      properties:
+        address: { type: string }
+        asOf: { $ref: "#/components/schemas/BlockReference" }
+        positions:
+          type: array
+          items: { $ref: "#/components/schemas/Position" }
+        warnings: { type: array, items: { type: string } }
+    Position:
+      oneOf:
+        - $ref: "#/components/schemas/WalletPosition"
+        - $ref: "#/components/schemas/LendingPosition"
+        - $ref: "#/components/schemas/LendingSupplyPosition"
+        - $ref: "#/components/schemas/LiquidityPosition"
+      discriminator: { propertyName: type }
+    PositionBase:
+      type: object
+      required: [id, type, protocol, provenance, confidence]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        protocol:
+          type: object
+          required: [id, version]
+          properties:
+            id: { type: string }
+            version: { type: string }
+            contract: { type: string }
+        provenance: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Provenance" } }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+    WalletPosition:
+      allOf:
+        - $ref: "#/components/schemas/PositionBase"
+        - type: object
+          required: [asset, spendable]
+          properties:
+            type: { const: wallet }
+            asset: { $ref: "#/components/schemas/AssetAmount" }
+            spendable: { type: boolean }
+    LendingPosition:
+      allOf:
+        - $ref: "#/components/schemas/PositionBase"
+        - type: object
+          required: [collateral, debt, parameters]
+          properties:
+            type: { const: lending }
+            collateral: { $ref: "#/components/schemas/AssetAmount" }
+            debt: { $ref: "#/components/schemas/AssetAmount" }
+            parameters:
+              type: object
+              required: [liquidationThresholdBps, maximumLtvBps]
+              properties:
+                liquidationThresholdBps: { type: integer, minimum: 1, maximum: 10000 }
+                maximumLtvBps: { type: integer, minimum: 1, maximum: 10000 }
+            rates:
+              type: object
+              description: Variable rates and deterministic debt projections read from the deployed lending vault at one pinned Stacks block.
+              required:
+                [
+                  borrowAprBps,
+                  supplyAprBps,
+                  utilizationBps,
+                  reserveFactorBps,
+                  observedAtBlock,
+                  debtProjections,
+                ]
+              properties:
+                borrowAprBps: { type: integer, minimum: 0 }
+                supplyAprBps: { type: integer, minimum: 0 }
+                utilizationBps: { type: integer, minimum: 0, maximum: 10000 }
+                reserveFactorBps: { type: integer, minimum: 0, maximum: 10000 }
+                observedAtBlock: { type: integer, minimum: 0 }
+                debtProjections:
+                  type: array
+                  minItems: 3
+                  maxItems: 3
+                  items:
+                    type: object
+                    required: [days, amountAtomic, assumption]
+                    properties:
+                      days: { enum: [7, 30, 90] }
+                      amountAtomic: { type: string, pattern: '^\d+$' }
+                      assumption: { type: string }
+    LendingSupplyPosition:
+      allOf:
+        - $ref: "#/components/schemas/PositionBase"
+        - type: object
+          required: [asset]
+          properties:
+            type: { const: supply }
+            asset: { $ref: "#/components/schemas/AssetAmount" }
+            rates:
+              type: object
+              description: Supply APY inputs read from the deployed lending vault at one pinned Stacks block.
+              required: [supplyAprBps, utilizationBps, reserveFactorBps, observedAtBlock]
+              properties:
+                supplyAprBps: { type: integer, minimum: 0 }
+                utilizationBps: { type: integer, minimum: 0, maximum: 10000 }
+                reserveFactorBps: { type: integer, minimum: 0, maximum: 10000 }
+                observedAtBlock: { type: integer, minimum: 0 }
+            earnings: { $ref: "#/components/schemas/EarningsEvidence" }
+    LiquidityPosition:
+      allOf:
+        - $ref: "#/components/schemas/PositionBase"
+        - type: object
+          required: [token0, token1, lowerPrice, upperPrice, currentPrice, exitSlippageBps]
+          properties:
+            type: { const: liquidity }
+            token0: { $ref: "#/components/schemas/AssetAmount" }
+            token1: { $ref: "#/components/schemas/AssetAmount" }
+            lowerPrice: { type: string }
+            upperPrice: { type: string }
+            currentPrice: { type: string }
+            exitSlippageBps: { type: [integer, "null"], minimum: 0 }
+            earnings: { $ref: "#/components/schemas/EarningsEvidence" }
+    RiskFinding:
+      type: object
+      required:
+        [
+          riskId,
+          positionId,
+          severity,
+          category,
+          score,
+          title,
+          meaning,
+          whyItMatters,
+          ifYouDoNothing,
+          plainMetrics,
+          evidence,
+          scenarios,
+          recommendedActions,
+          model,
+          confidence,
+          expiresAt,
+        ]
+      properties:
+        riskId: { type: string }
+        positionId: { type: string }
+        severity: { enum: [info, low, medium, high, critical] }
+        category: { enum: [liquidation, liquidity, oracle, bridge, unsupported] }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        title: { type: string }
+        meaning: { type: string }
+        whyItMatters: { type: string }
+        ifYouDoNothing: { type: string }
+        plainMetrics:
+          type: array
+          items:
+            type: object
+            required: [label, value, meaning]
+            properties:
+              label: { type: string }
+              value: { type: string }
+              meaning: { type: string }
+        evidence: { type: array, items: { type: object } }
+        scenarios: { type: array, items: { type: object } }
+        recommendedActions: { type: array, items: { type: object } }
+        model: { type: object }
+        confidence: { $ref: "#/components/schemas/Confidence" }
+        expiresAt: { type: string, format: date-time }
+    PortfolioSummary:
+      type: object
+      required:
+        [
+          address,
+          asOf,
+          currency,
+          headline,
+          centralAnswer,
+          risk,
+          allocations,
+          protocols,
+          deployment,
+          scenarios,
+          data,
+        ]
+      properties:
+        address: { type: string }
+        asOf: { $ref: "#/components/schemas/BlockReference" }
+        currency: { const: USD }
+        headline: { type: string }
+        centralAnswer: { type: object }
+        totalAssetsUsd: { type: [string, "null"] }
+        totalDebtUsd: { type: [string, "null"] }
+        netWorthUsd: { type: [string, "null"] }
+        deployedUsd: { type: [string, "null"] }
+        idleUsd: { type: [string, "null"] }
+        risk: { type: object }
+        allocations: { type: array, items: { type: object } }
+        protocols: { type: array, items: { type: object } }
+        deployment: { type: object }
+        scenarios: { type: array, items: { type: object } }
+        metricMeanings: { type: array, items: { type: object } }
+        data: { type: object }
+    TransactionIntent:
+      type: object
+      required:
+        [
+          intentId,
+          network,
+          status,
+          expiresAt,
+          reason,
+          calls,
+          guardrails,
+          simulation,
+          registryVersion,
+          adapterVersion,
+          warnings,
+        ]
+      properties:
+        intentId: { type: string }
+        network: { enum: [mainnet, testnet] }
+        status: { enum: [blocked, ready] }
+        expiresAt: { type: string, format: date-time }
+        reason: { type: object }
+        calls: { type: array, items: { type: object } }
+        guardrails: { type: object }
+        simulation: { type: object }
+        registryVersion: { type: string }
+        adapterVersion: { type: string }
+        warnings: { type: array, items: { type: string } }
+        intentHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+        executionMode: { enum: [shadow, testnet, mainnet] }
+        workflowState: { enum: [planned, wallet-requested, submitted, confirmed, blocked] }
+    WalletChallenge:
+      type: object
+      required: [challengeId, address, message, expiresAt]
+      properties:
+        challengeId: { type: string }
+        address: { type: string }
+        message: { type: string }
+        expiresAt: { type: string, format: date-time }
+    AlertRule:
+      type: object
+      required: [ruleId, address, name, categories, minimumSeverity, enabled, cooldownSeconds, createdAt]
+      properties:
+        ruleId: { type: string }
+        address: { type: string }
+        name: { type: string }
+        categories: { type: array, items: { type: string } }
+        minimumSeverity: { enum: [info, low, medium, high, critical] }
+        enabled: { type: boolean }
+        cooldownSeconds: { type: integer, minimum: 60 }
+        createdAt: { type: string, format: date-time }
+    AlertOccurrence:
+      type: object
+      required: [occurrenceId, ruleId, address, riskId, severity, title, evidence, state, openedAt, updatedAt]
+      properties:
+        occurrenceId: { type: string }
+        ruleId: { type: string }
+        address: { type: string }
+        riskId: { type: string }
+        severity: { enum: [info, low, medium, high, critical] }
+        title: { type: string }
+        evidence: { type: array, items: { type: object } }
+        state: { enum: [open, acknowledged, resolved] }
+        openedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AlertsResponse:
+      type: object
+      required: [address, rules, occurrences]
+      properties:
+        address: { type: string }
+        rules: { type: array, items: { $ref: "#/components/schemas/AlertRule" } }
+        occurrences: { type: array, items: { $ref: "#/components/schemas/AlertOccurrence" } }
+    SbtcOperation:
+      type: object
+      required: [operationKey, direction, state, canonical, reasons, stacksEvents, emily, bitcoin]
+      properties:
+        operationKey: { type: string }
+        direction: { enum: [deposit, withdrawal] }
+        state:
+          {
+            enum:
+              [
+                requested,
+                signer-accepted,
+                bitcoin-confirming,
+                stacks-completed-bitcoin-unverified,
+                completed,
+                failed,
+                evidence-conflict,
+              ],
+          }
+        canonical: { type: boolean }
+        reasons: { type: array, items: { type: string } }
+        stacksEvents: { type: array, items: { type: object } }
+        emily: { type: [object, "null"] }
+        bitcoin: { type: array, items: { type: object } }
+    Problem:
+      type: object
+      required: [type, title, status, code, detail]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }

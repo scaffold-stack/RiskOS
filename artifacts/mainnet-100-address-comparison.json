@@ -1,0 +1,816 @@
+{
+  "runId": "5a3b283b-2f2a-4f82-a7d2-33361619a4fb",
+  "addressCount": 100,
+  "matchedCount": 100,
+  "mismatchCount": 0,
+  "passed": true,
+  "meta": {
+    "mode": "local-adapters",
+    "independence": "local-adapter-self-consistency",
+    "inputPath": "/Users/apple/Desktop/learnclarity/research/fixtures/mainnet-100-addresses.json",
+    "generatedAt": "2026-09-04T18:18:55.343Z",
+    "note": "Engineering gate artifact. Replace with separate-http-deployments before public beta claim."
+  },
+  "results": [
+    {
+      "address": "SP1BXRXA0Z67MB6G31FP1R52ZX5GQTZ5008KZG77A",
+      "matched": true,
+      "candidateDigest": "0ec2f755c24cdecd252ca53356e6797269b558297c78e43bb881bef40e6a5319",
+      "referenceDigest": "0ec2f755c24cdecd252ca53356e6797269b558297c78e43bb881bef40e6a5319",
+      "candidatePositionCount": 5,
+      "referencePositionCount": 5
+    },
+    {
+      "address": "SP288D9CSDS3C10Z5C5J0R2ZE51HKZ35W4XWXKW7H",
+      "matched": true,
+      "candidateDigest": "aea83ca9d0ac5f889e3bc24bbdee851971828eeae3e3db5b8498c3ed7360cdd7",
+      "referenceDigest": "aea83ca9d0ac5f889e3bc24bbdee851971828eeae3e3db5b8498c3ed7360cdd7",
+      "candidatePositionCount": 2,
+      "referencePositionCount": 2
+    },
+    {
+      "address": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR",
+      "matched": true,
+      "candidateDigest": "a61c4b3813a2409968eaf08b7d86b27cc82035d942ab9c948d1b8a0ffbe27881",
+      "referenceDigest": "a61c4b3813a2409968eaf08b7d86b27cc82035d942ab9c948d1b8a0ffbe27881",
+      "candidatePositionCount": 118,
+      "referencePositionCount": 118
+    },
+    {
+      "address": "SP3K8BC0PPEVCV7NZ6AGAXWG5XA0Z0Y1WXA9YJ7ZQ",
+      "matched": true,
+      "candidateDigest": "f855758914d43df63d13cf35e129349e0d63e449d65b6308f51f64afb8a745fb",
+      "referenceDigest": "f855758914d43df63d13cf35e129349e0d63e449d65b6308f51f64afb8a745fb",
+      "candidatePositionCount": 1,
+      "referencePositionCount": 1
+    },
+    {
+      "address": "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE",
+      "matched": true,
+      "candidateDigest": "36d36850c032c4b9ab6d21cd426adf4edc0fb1721c8f3617fb6c4ffa3f975620",
+      "referenceDigest": "36d36850c032c4b9ab6d21cd426adf4edc0fb1721c8f3617fb6c4ffa3f975620",
+      "candidatePositionCount": 23,
+      "referencePositionCount": 23
+    },
+    {
+      "address": "SP000000000000000000002Q6VF78",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000000",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000001",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000002",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000003",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000004",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000005",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000006",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000007",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000008",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000009",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000A",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000B",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000C",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000D",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000E",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000F",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000G",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000H",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000I",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000J",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000K",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000L",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000M",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000N",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000O",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000P",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000Q",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000R",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000S",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000T",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000U",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000V",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000W",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000X",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000Y",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000000Z",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000010",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000011",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000012",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000013",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000014",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000015",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000016",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000017",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000018",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000019",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001A",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001B",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001C",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001D",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001E",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001F",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001G",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001H",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001I",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001J",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001K",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001L",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001M",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001N",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001O",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001P",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001Q",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001R",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001S",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001T",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001U",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001V",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001W",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001X",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001Y",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000001Z",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000020",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000021",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000022",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000023",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000024",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000025",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000026",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000027",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000028",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP00000000000000000000000000000000000029",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002A",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002B",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002C",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002D",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002E",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002F",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002G",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    },
+    {
+      "address": "SP0000000000000000000000000000000000002H",
+      "matched": true,
+      "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "referenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "candidatePositionCount": 0,
+      "referencePositionCount": 0
+    }
+  ]
+}

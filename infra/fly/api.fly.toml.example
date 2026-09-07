@@ -1,0 +1,39 @@
+# Copy to fly.toml, choose an available app name, and set WEB_ORIGIN as a secret.
+app = "replace-with-riskos-api-name"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[deploy]
+  release_command = "npm run db:migrate"
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "3001"
+  DATA_MODE = "live"
+  NETWORK = "mainnet"
+  STACKS_API_URL = "https://api.mainnet.hiro.so"
+  BITFLOW_APP_API_URL = "https://bff.bitflowapis.finance/api/app"
+  BITFLOW_QUOTES_API_URL = "https://bff.bitflowapis.finance/api/quotes"
+  SBTC_EMILY_URL = "https://sbtc-emily.com"
+  BITCOIN_ESPLORA_URL = "https://mempool.space/api"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    timeout = "3s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

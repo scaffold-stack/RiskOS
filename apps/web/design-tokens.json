@@ -1,0 +1,15 @@
+{
+  "brand": "RiskOSfolio",
+  "direction": "Bitcoin Treasury Terminal — White and Green",
+  "colors": {
+    "forest950": "#061D15", "forest900": "#09271D", "forest800": "#103D2E",
+    "emerald700": "#087A50", "emerald600": "#0A8F5F", "emerald500": "#12A66F",
+    "mint400": "#35D69B", "mint300": "#7BE0B7", "mint100": "#C9F5E4",
+    "mint50": "#EBFAF4", "canvas": "#F5FAF7", "paper": "#FFFFFF",
+    "border": "#DCEAE3", "textMuted": "#5F736A", "warning": "#BD721C",
+    "critical": "#C63F52", "informational": "#4169B2"
+  },
+  "typography": {"interface":"DM Sans, Arial, sans-serif","data":"IBM Plex Mono, monospace","bodyMinimum":16,"labelMinimum":14},
+  "radius": {"control":9,"card":14,"feature":18},
+  "breakpoints": {"mobile":700,"tablet":1100,"desktop":1240}
+}

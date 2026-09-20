@@ -82,6 +82,8 @@ export class FixtureBitflowAdapter implements ProtocolAdapter {
           earnedToDateUsd: null,
           observedAtBlock: provenance[0]!.blockHeight ?? 0,
           meaning: "Deterministic fixture yield; not live protocol evidence",
+          provenance,
+          confidence: { state: "estimated", score: 0.5, reasons: ["Fixture-only yield input"] },
         },
         provenance,
         confidence: {

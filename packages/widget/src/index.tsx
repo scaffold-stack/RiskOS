@@ -75,7 +75,7 @@ export function RiskOsWidget({ apiBaseUrl, address, theme = "stacks", onProtect,
       </div>
       <p style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.4 }}>{summary.centralAnswer.canGoWrong}</p>
       <div style={{ display: "grid", gap: 6, fontSize: 13, marginBottom: 14 }}>
-        <div><span style={{ color: "#818688" }}>Capital at risk </span><strong>{summary.risk.capitalAtRiskUsd ? `$${summary.risk.capitalAtRiskUsd}` : "n/a"}</strong></div>
+        <div><span style={{ color: "#818688" }}>Capital at risk </span><strong>{summary.risk.capitalAtRiskUsd ? `$${summary.risk.capitalAtRiskUsd}` : "Not calculated"}</strong></div>
         <div><span style={{ color: "#818688" }}>Freshness </span><strong>{summary.data.state} · block {summary.data.stacksBlockHeight}</strong></div>
         {topRisk && (
           <div style={{ color: severityColor(topRisk.severity) }}>

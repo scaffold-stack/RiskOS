@@ -46,11 +46,14 @@ describe("Zest mainnet repayment shadow", () => {
     if (!position || position.type !== "lending") throw new Error("fixture missing");
     const market = "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-8-market";
     const debtContract = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token";
+    const now = new Date("2026-09-04T12:00:00Z");
     const live = { ...position, protocol: { id: "zest", version: "zest-v2-v0.8-repay-shadow-2026-09", contract: market }, debt: {
       ...position.debt, valueUsd: null, amountAtomic: "100000000", protocolAssetId: 2,
       contractPrincipal: debtContract, assetIdentifier: `${debtContract}::sbtc-token`,
-    }, collateral: { ...position.collateral, valueUsd: null } };
-    const now = new Date("2026-09-04T12:00:00Z");
+    }, collateral: { ...position.collateral, valueUsd: null },
+      provenance: [{ source: "contract-read" as const, blockHeight: 900, observedAt: now.toISOString() }],
+      confidence: { state: "verified" as const, score: 0.92, reasons: ["Pinned contract read"] },
+    };
     const manifest = registryManifestSchema.parse({ version: "2026-09-04.1", network: "mainnet", issuedAt: now.toISOString(), expiresAt: "2026-10-04T00:00:00Z", entries: [{
       protocol: "zest-v2", adapterVersion: live.protocol.version, network: "mainnet", contractPrincipal: market,
       interfaceHash: `sha256:${"a".repeat(64)}`, activationBlock: 1, supportedAssets: ["sBTC"], readOnlyFunctions: [], transactionFunctions: ["repay"],

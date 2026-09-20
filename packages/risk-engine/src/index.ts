@@ -16,19 +16,37 @@ function pct(bps: number): string {
   return `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 2)}%`;
 }
 
+function lendingLegValue(
+  position: LendingPosition,
+  kind: "collateral" | "debt",
+): bigint | null {
+  const legs = position.legs?.[kind] ?? [position[kind]];
+  if (legs.some((leg) => leg.valueUsd === null)) return null;
+  return legs.reduce((sum, leg) => sum + decimalToScaled(leg.valueUsd!), 0n);
+}
+
+function isSingleAssetLendingPosition(position: LendingPosition): boolean {
+  return (position.legs?.collateral.length ?? 1) === 1 && (position.legs?.debt.length ?? 1) === 1;
+}
+
 export function lendingHealthFactor(position: LendingPosition): string | null {
-  if (position.collateral.valueUsd === null || position.debt.valueUsd === null) return null;
-  const collateral = decimalToScaled(position.collateral.valueUsd);
-  const debt = decimalToScaled(position.debt.valueUsd);
+  const collateral = lendingLegValue(position, "collateral");
+  const debt = lendingLegValue(position, "debt");
+  if (collateral === null || debt === null || debt === 0n) return null;
   return ratioToDecimal(collateral * BigInt(position.parameters.liquidationThresholdBps), debt * 10_000n, 4);
 }
 
 export function lendingLtv(position: LendingPosition): string | null {
-  if (position.collateral.valueUsd === null || position.debt.valueUsd === null) return null;
-  return ratioToDecimal(decimalToScaled(position.debt.valueUsd), decimalToScaled(position.collateral.valueUsd), 4);
+  const collateral = lendingLegValue(position, "collateral");
+  const debt = lendingLegValue(position, "debt");
+  if (collateral === null || debt === null || collateral === 0n) return null;
+  return ratioToDecimal(debt, collateral, 4);
 }
 
 export function lendingLiquidationPriceUsd(position: LendingPosition): string | null {
+  // One liquidation price is not meaningful for a basket with multiple
+  // collateral or debt assets; health/LTV remain valid at aggregate USD value.
+  if (!isSingleAssetLendingPosition(position)) return null;
   if (position.collateral.valueUsd === null || position.debt.valueUsd === null) return null;
   const amount = BigInt(position.collateral.amountAtomic);
   if (amount === 0n) return null;
@@ -41,6 +59,7 @@ export function lendingLiquidationPriceUsd(position: LendingPosition): string | 
 }
 
 export function currentCollateralPriceUsd(position: LendingPosition): string | null {
+  if (!isSingleAssetLendingPosition(position)) return null;
   if (position.collateral.valueUsd === null) return null;
   const amount = BigInt(position.collateral.amountAtomic);
   if (amount === 0n) return null;
@@ -78,8 +97,8 @@ function lendingRisk(position: LendingPosition, now: Date): RiskFinding {
     : scaledHealth <= 12_000n ? "medium"
     : "low";
   const score = lendingScore(scaledHealth);
-  const debt = position.debt.valueUsd === null ? 0n : decimalToScaled(position.debt.valueUsd);
-  const collateral = position.collateral.valueUsd === null ? 0n : decimalToScaled(position.collateral.valueUsd);
+  const debt = lendingLegValue(position, "debt") ?? 0n;
+  const collateral = lendingLegValue(position, "collateral") ?? 0n;
   const adjusted = collateral * BigInt(position.parameters.liquidationThresholdBps) / 10_000n;
   const targetDebt = adjusted * 10_000n / 13_500n;
   const repayAtomicUsd = debt > targetDebt ? debt - targetDebt : 0n;
@@ -112,7 +131,9 @@ function lendingRisk(position: LendingPosition, now: Date): RiskFinding {
     {
       label: "Est. liquidation price",
       value: liquidationPrice ? `$${Number(liquidationPrice).toLocaleString()}` : "unknown",
-      meaning: distance === null
+      meaning: !isSingleAssetLendingPosition(position)
+        ? "A single liquidation price would be misleading for this multi-asset collateral/debt basket; use aggregate health and LTV."
+        : distance === null
         ? "Needs a trusted collateral price."
         : `About ${distance}% below the current ${position.collateral.asset} mark if other prices hold.`,
     },
@@ -161,8 +182,8 @@ function lendingRisk(position: LendingPosition, now: Date): RiskFinding {
       { metric: "ltv", value: ltv ?? "unknown" },
       { metric: "liquidationThresholdBps", value: String(position.parameters.liquidationThresholdBps) },
       { metric: "maximumLtvBps", value: String(position.parameters.maximumLtvBps) },
-      { metric: "collateralValueUsd", value: position.collateral.valueUsd ?? "unknown" },
-      { metric: "debtValueUsd", value: position.debt.valueUsd ?? "unknown" },
+      { metric: "collateralValueUsd", value: collateral > 0n ? ratioToDecimal(collateral, 100_000_000n, 2)! : "unknown" },
+      { metric: "debtValueUsd", value: debt > 0n ? ratioToDecimal(debt, 100_000_000n, 2)! : "unknown" },
       { metric: "estimatedLiquidationPriceUsd", value: liquidationPrice ?? "unknown" },
       { metric: "currentCollateralPriceUsd", value: currentPrice ?? "unknown" },
       ...(position.rates ? [
@@ -204,7 +225,7 @@ function evidenceFreshnessRisk(position: Position, now: Date, maximumAgeSeconds:
   const newest = Math.max(...position.provenance.map((item) => Date.parse(item.observedAt)).filter(Number.isFinite));
   const ageSeconds = Number.isFinite(newest) ? Math.max(0, Math.floor((now.getTime() - newest) / 1000)) : Number.MAX_SAFE_INTEGER;
   const missingPrice = position.type === "wallet" || position.type === "supply" ? position.asset.valueUsd === null
-    : position.type === "lending" ? position.collateral.valueUsd === null || position.debt.valueUsd === null
+    : position.type === "lending" ? lendingLegValue(position, "collateral") === null || lendingLegValue(position, "debt") === null
     : position.token0.valueUsd === null || position.token1.valueUsd === null;
   if (!missingPrice && ageSeconds <= maximumAgeSeconds && position.confidence.state !== "degraded") return null;
   const severity = missingPrice || ageSeconds > maximumAgeSeconds * 3 ? "high" : "medium";
@@ -287,7 +308,7 @@ function liquidityRisk(position: LiquidityPosition, now: Date): RiskFinding {
       },
       {
         label: "Distance in range",
-        value: inRange && toLower && toUpper ? `${toLower}% from low / ${toUpper}% from high` : "n/a",
+        value: inRange && toLower && toUpper ? `${toLower}% from low / ${toUpper}% from high` : "Not modeled",
         meaning: "Price distance from the current market mark to each range bound.",
       },
       {

@@ -1,0 +1,146 @@
+[
+  {
+    "address": "SP1BXRXA0Z67MB6G31FP1R52ZX5GQTZ5008KZG77A",
+    "scenario": "bitflow_fee_apy",
+    "label": "Bitflow sBTC-USDCx-LP APY 27.49% \u00b7 $291337.17 \u00b7 in-range",
+    "protocols": [
+      "bitflow"
+    ]
+  },
+  {
+    "address": "SP2ZM1KNQNS96RM1MAJTZV7WE7F38GFGRND4E80DW",
+    "scenario": "bitflow_fee_apy",
+    "label": "Bitflow sBTC-USDCx-LP APY 83.4% \u00b7 $55069.88 \u00b7 in-range",
+    "protocols": [
+      "bitflow"
+    ]
+  },
+  {
+    "address": "SP23PF43T06AH0BA2XD7XYKH16GECH242S238WK60",
+    "scenario": "bitflow_fee_apy",
+    "label": "Bitflow sBTC-USDCx-LP APY 8.96% \u00b7 $152.34 \u00b7 in-range",
+    "protocols": [
+      "bitflow"
+    ]
+  },
+  {
+    "address": "SP3XZXY4TMXV09EXHRZSM3KF7054FYN8FX9KY1JAP",
+    "scenario": "bitflow_fee_apy",
+    "label": "Bitflow sBTC-USDCx-LP APY 2.1% \u00b7 $5110.43 \u00b7 in-range",
+    "protocols": [
+      "bitflow"
+    ]
+  },
+  {
+    "address": "SP3Z2867B5R95YWGQ7B2RYRETKVK766D4483EJBDR",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zSTX 2.51% APR \u00b7 $46080.96",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP1ZJHN74VH26SPHHJB4YP6NSEYVKFZD1W0ZK5K9H",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zSTX 2.51% APR \u00b7 $1013.75",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP24V5991H6XX2WPMH53MBBBEZ8XZRPG87F0TNY6X",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $13772.57",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP3XBCE7R73W9TPWSM3B1NYKHYY9P5K81HE0TWPRP",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $1964.42",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP19J34B0X3XQM4KV41X3BF3NX50PE41JPSMNXT6M",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $1152.83",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP1273QGV0M6K7982ZEWPZKB06RHRXM3NM7G4X0CS",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $1126.19",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP288D9CSDS3C10Z5C5J0R2ZE51HKZ35W4XWXKW7H",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $544.37",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP237HW75F3KFZQ95WC4BJTJR9C73A39NSBDJ6BC1",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $4.85",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP1NCG226XTNTTW0H34735VW446WR8AEYCY8Z3YBA",
+    "scenario": "zest_supply_apr",
+    "label": "Zest supply zstSTX 0.07% APR \u00b7 $2.73",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP3KPRN53ZGD45B3WRTDMZZEHBJSFQ8AKN9RE6FKS",
+    "scenario": "zest_market_rates",
+    "label": "Zest zSTX/sBTC supply 2.51% vs borrow 0.01% (net 2.50%)",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP1EKDMMG508FY96RSEQ1EFGGZ6J8T8DCDPAM12HS",
+    "scenario": "zest_market_rates",
+    "label": "Zest zSTX/USDCx supply 2.51% vs borrow 2.71% (net -0.20%)",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP1BJGDG8MSM64DMH33A0F1NB0DT40YGBPSW00NES",
+    "scenario": "zest_market_rates",
+    "label": "Zest zSTX/USDCx supply 2.51% vs borrow 2.71% (net -0.20%)",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP26E434SDGRSA9QF5D65A3WZ29Y0MXD9AMXFJYDC",
+    "scenario": "zest_market_rates",
+    "label": "Zest zSTX/USDCx supply 2.51% vs borrow 2.71% (net -0.20%)",
+    "protocols": [
+      "zest"
+    ]
+  },
+  {
+    "address": "SP2M7K3YM8813404G1R7AXV106CPWH0Z5ZA80JVAV",
+    "scenario": "zest_market_rates",
+    "label": "Zest zstSTX/USDCx supply 0.07% vs borrow 2.71% (net -2.64%)",
+    "protocols": [
+      "zest"
+    ]
+  }
+]

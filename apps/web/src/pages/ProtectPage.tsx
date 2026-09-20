@@ -260,7 +260,9 @@ export function ProtectPage(props: ProtectPageProps) {
               </button>
             </div>
             <p className="protect-builder-note">
-              Non-custodial: RiskOS builds an unsigned intent. Your wallet signs and broadcasts.
+              {isShadow
+                ? "Non-custodial mainnet preview: RiskOS simulates the intent, but signing and broadcast remain disabled."
+                : "Non-custodial testnet flow: RiskOS builds an unsigned intent; your wallet chooses whether to sign and broadcast."}
             </p>
           </div>
         </section>

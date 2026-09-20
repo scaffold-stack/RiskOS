@@ -14,6 +14,7 @@ export type Route =
   | "reports"
   | "team"
   | "integrations"
+  | "pricing"
   | "settings";
 
 const primary: Array<{ route: Route; label: string; icon: IconName }> = [
@@ -21,16 +22,20 @@ const primary: Array<{ route: Route; label: string; icon: IconName }> = [
   { route: "positions", label: "Positions", icon: "positions" },
   { route: "risk", label: "Risk", icon: "risk" },
   { route: "protect", label: "Protect", icon: "protect" },
+  { route: "alerts", label: "Alerts", icon: "alerts" },
+];
+
+const enabledSecondary: Array<{ route: Route; label: string; icon: IconName }> = [
+  { route: "reports", label: "Reports", icon: "reports" },
+  { route: "integrations", label: "Developers", icon: "integrations" },
+  { route: "pricing", label: "Plans", icon: "rewards" },
 ];
 
 const comingSoon: Array<{ route: Route; label: string; icon: IconName }> = [
-  { route: "alerts", label: "Alerts", icon: "alerts" },
   { route: "markets", label: "Markets", icon: "markets" },
   { route: "bridge", label: "Bridge", icon: "bridge" },
   { route: "rewards", label: "Rewards", icon: "rewards" },
-  { route: "reports", label: "Reports", icon: "reports" },
   { route: "team", label: "Team", icon: "team" },
-  { route: "integrations", label: "Integrations", icon: "integrations" },
   { route: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -69,7 +74,7 @@ export function AppShell({
   walletConnected,
   walletBusy,
   portfolioActive,
-  alertCount: _alertCount,
+  alertCount,
   modeLabel = "Mainnet · advisory protect",
   lastUpdatedAt,
   onWalletConnect,
@@ -99,6 +104,24 @@ export function AppShell({
             >
               <Icon name={item.icon} />
               <span>{item.label}</span>
+              {item.route === "alerts" && alertCount > 0 ? (
+                <b className="nav-soon">{alertCount > 99 ? "99+" : alertCount}</b>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+        <div className="nav-divider" />
+        <nav className="nav-block" aria-label="Developer and plans">
+          {enabledSecondary.map((item) => (
+            <button
+              key={item.route}
+              className={`nav-link ${route === item.route ? "active" : ""}`}
+              onClick={() => onRouteChange(item.route)}
+              aria-current={route === item.route ? "page" : undefined}
+            >
+              <Icon name={item.icon} />
+              <span>{item.label}</span>
+              {item.route === "pricing" ? <b className="nav-soon">Plans</b> : null}
             </button>
           ))}
         </nav>

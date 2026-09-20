@@ -3,7 +3,7 @@ import { Icon } from "../components/Icons.js";
 const modules = [
   ["01", "Unified position API", "Balances, debt, collateral, and LP ranges normalized behind one address."],
   ["02", "Stacks-native risk engine", "Liquidation, exit-liquidity, bridge, oracle, and unsupported-exposure findings."],
-  ["03", "Protective execution", "Allowlisted, expiring actions are simulated before a user chooses to sign."],
+  ["03", "Protective planning", "Allowlisted, expiring actions are simulated. Mainnet remains advisory until execution gates pass."],
   ["04", "Evidence foundation", "Canonical events, signed registries, source confidence, and reorg-aware snapshots."],
 ] as const;
 
@@ -37,7 +37,7 @@ export function LandingPage({ onLaunch }: { onLaunch: () => void }) {
           </h1>
           <p>
             RiskOSfolio answers one question: where is your Bitcoin capital, what is it earning, what can go wrong,
-            and what is the safest user-signed action right now — without custody.
+            and what is the safest user-controlled next step right now — without custody.
           </p>
           <div className="hero-actions">
             <button className="btn primary" onClick={onLaunch}>
@@ -82,8 +82,8 @@ export function LandingPage({ onLaunch }: { onLaunch: () => void }) {
                 <strong>Verified</strong>
               </div>
               <div className="mini-card">
-                <span>Execution</span>
-                <strong>User-signed</strong>
+                <span>Mainnet action</span>
+                <strong>Advisory</strong>
               </div>
             </div>
             <div className="hero-chart">
@@ -105,8 +105,8 @@ export function LandingPage({ onLaunch }: { onLaunch: () => void }) {
             <div className="float-value">Index-hash bound</div>
           </div>
           <div className="float-card two">
-            <div className="float-label">PROTECTIVE ACTIONS</div>
-            <div className="float-value">Simulate before signing</div>
+            <div className="float-label">PROTECTIVE PLANNING</div>
+            <div className="float-value">Simulate before acting</div>
           </div>
         </div>
       </section>

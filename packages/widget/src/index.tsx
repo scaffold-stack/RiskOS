@@ -11,17 +11,17 @@ export interface RiskOsWidgetProps {
 
 const stacksTheme: CSSProperties = {
   fontFamily: '"DM Sans", Arial, sans-serif',
-  color: "#131416",
-  background: "#fdfdfc",
-  border: "1px solid #eae7e1",
-  borderRadius: 16,
+  color: "#09271d",
+  background: "#ffffff",
+  border: "1px solid #dceae3",
+  borderRadius: 14,
   padding: 16,
 };
 
 function severityColor(severity: RiskFinding["severity"]) {
-  if (severity === "critical" || severity === "high") return "#ea384c";
-  if (severity === "medium") return "#ff9100";
-  return "#178a63";
+  if (severity === "critical" || severity === "high") return "#c63f52";
+  if (severity === "medium") return "#bd721c";
+  return "#087a50";
 }
 
 /**
@@ -36,13 +36,14 @@ export function RiskOsWidget({ apiBaseUrl, address, theme = "stacks", onProtect,
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const client = new RiskOsClient({ baseUrl: apiBaseUrl });
     setLoading(true);
-    Promise.all([client.getPortfolio(address), client.getRisk(address)])
-      .then(([portfolio, risk]) => {
+    client.getOverview(address, { signal: controller.signal })
+      .then((overview) => {
         if (cancelled) return;
-        setSummary(portfolio);
-        setTopRisk([...risk.risks].sort((a, b) => b.score - a.score)[0] ?? null);
+        setSummary(overview.portfolio);
+        setTopRisk([...overview.risks].sort((a, b) => b.score - a.score)[0] ?? null);
         setError("");
       })
       .catch((cause) => {
@@ -52,7 +53,10 @@ export function RiskOsWidget({ apiBaseUrl, address, theme = "stacks", onProtect,
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [apiBaseUrl, address]);
 
   const style = theme === "stacks" ? stacksTheme : { ...stacksTheme, background: "transparent" };
@@ -60,23 +64,25 @@ export function RiskOsWidget({ apiBaseUrl, address, theme = "stacks", onProtect,
   if (loading) return <div style={style}>Loading RiskOS evidence…</div>;
   if (error) return <div style={style}><strong>RiskOS unavailable</strong><p>{error}</p></div>;
   if (!summary) return <div style={style}>No portfolio evidence for this address.</div>;
+  const protectPositionId = topRisk?.positionId ?? summary.risk.drivers[0]?.positionId ?? "";
+  const protectionAvailable = Boolean(protectPositionId);
 
   return (
     <section style={style} aria-label="RiskOSfolio embedded risk panel">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 12, color: "#818688", textTransform: "uppercase", fontWeight: 600 }}>RiskOSfolio</div>
+          <div style={{ fontSize: 12, color: "#5f736a", textTransform: "uppercase", fontWeight: 600 }}>RiskOSfolio</div>
           <strong style={{ fontSize: 18 }}>{summary.risk.classification}</strong>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 12, color: "#818688" }}>Score</div>
-          <strong style={{ color: "#fc6432", fontSize: 22 }}>{summary.risk.score}</strong>
+          <div style={{ fontSize: 12, color: "#5f736a" }}>Score</div>
+          <strong style={{ color: topRisk ? severityColor(topRisk.severity) : "#087a50", fontSize: 22 }}>{summary.risk.score}</strong>
         </div>
       </div>
       <p style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.4 }}>{summary.centralAnswer.canGoWrong}</p>
       <div style={{ display: "grid", gap: 6, fontSize: 13, marginBottom: 14 }}>
-        <div><span style={{ color: "#818688" }}>Capital at risk </span><strong>{summary.risk.capitalAtRiskUsd ? `$${summary.risk.capitalAtRiskUsd}` : "Not calculated"}</strong></div>
-        <div><span style={{ color: "#818688" }}>Freshness </span><strong>{summary.data.state} · block {summary.data.stacksBlockHeight}</strong></div>
+        <div><span style={{ color: "#5f736a" }}>Capital at risk </span><strong>{summary.risk.capitalAtRiskUsd ? `$${summary.risk.capitalAtRiskUsd}` : "Not calculated"}</strong></div>
+        <div><span style={{ color: "#5f736a" }}>Freshness </span><strong>{summary.data.state} · block {summary.data.stacksBlockHeight}</strong></div>
         {topRisk && (
           <div style={{ color: severityColor(topRisk.severity) }}>
             {topRisk.severity}: {topRisk.meaning}
@@ -87,19 +93,20 @@ export function RiskOsWidget({ apiBaseUrl, address, theme = "stacks", onProtect,
         <button
           type="button"
           onClick={() => onOpenDetails?.()}
-          style={{ flex: 1, height: 40, borderRadius: 10, border: "1px solid #eae7e1", background: "#fff", cursor: "pointer" }}
+          style={{ flex: 1, height: 40, borderRadius: 10, border: "1px solid #dceae3", background: "#fff", color: "#09271d", cursor: "pointer" }}
         >
           View details
         </button>
         <button
           type="button"
-          onClick={() => onProtect?.(topRisk?.positionId ?? summary.risk.drivers[0]?.positionId ?? "")}
-          style={{ flex: 1, height: 40, borderRadius: 10, border: 0, background: "#fc6432", color: "#fff", cursor: "pointer" }}
+          disabled={!protectionAvailable}
+          onClick={() => protectionAvailable && onProtect?.(protectPositionId)}
+          style={{ flex: 1, height: 40, borderRadius: 10, border: 0, background: protectionAvailable ? "#12a66f" : "#dceae3", color: protectionAvailable ? "#fff" : "#5f736a", cursor: protectionAvailable ? "pointer" : "not-allowed" }}
         >
-          Protect position
+          {protectionAvailable ? "Protect position" : "No action needed"}
         </button>
       </div>
-      <p style={{ margin: "10px 0 0", fontSize: 11, color: "#818688" }}>
+      <p style={{ margin: "10px 0 0", fontSize: 11, color: "#5f736a" }}>
         Advisory only — RiskOS never custodies funds. Mainnet execution remains shadow/advisory.
       </p>
     </section>

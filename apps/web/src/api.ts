@@ -133,6 +133,25 @@ export interface YieldAllocationPlanView {
   warnings: string[];
 }
 
+export interface CommercialPlanView {
+  id: "free" | "pro" | "treasury" | "developer" | "protocol";
+  name: string;
+  audience: string;
+  priceUsdMonthly: number | null;
+  apiRequestsMonthly: number;
+  maxAlertRules: number;
+  maxWallets: number;
+  features: string[];
+  highlights: string[];
+}
+
+export interface PlansResponse {
+  currency: "USD";
+  billingState: "manual-provisioning";
+  plans: CommercialPlanView[];
+  executionFeesEnabled: false;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -178,6 +197,32 @@ export function getHealth() {
     pricing?: string;
     modules?: Record<string, string>;
   }>("/health");
+}
+
+export function getPlans() {
+  return request<PlansResponse>("/v1/plans");
+}
+
+export function getAccountPlan() {
+  return request<{ plan: CommercialPlanView; entitlement: { endsAt: string | null } | null }>("/v1/account/plan");
+}
+
+export function getPortfolioEvidenceReport() {
+  return request<{
+    schemaVersion: "riskos.report.v1";
+    generatedAt: string;
+    address: string;
+    plan: "pro" | "treasury" | "protocol";
+    portfolio: PortfolioSummary;
+    positions: PositionEnvelope;
+    risks: RiskFinding[];
+    integrity: {
+      walletOwnershipAuthenticated: true;
+      currentEvidenceOnly: true;
+      advisoryOnly: boolean;
+      meaning: string;
+    };
+  }>("/v1/reports/portfolio");
 }
 
 export function getPositions(address: string) {

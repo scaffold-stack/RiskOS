@@ -21,6 +21,8 @@ import { RiskPage } from "./pages/RiskPage.js";
 import { ScopedPage } from "./pages/ScopedPage.js";
 import { AlertsPage } from "./pages/AlertsPage.js";
 import { IntegrationsPage } from "./pages/IntegrationsPage.js";
+import { PricingPage } from "./pages/PricingPage.js";
+import { ReportsPage } from "./pages/ReportsPage.js";
 import {
   createAlertRule,
   createWalletChallenge,
@@ -60,6 +62,7 @@ const routes = new Set<Route>([
   "reports",
   "team",
   "integrations",
+  "pricing",
   "settings",
 ]);
 type AppRoute = Route | "landing";
@@ -425,6 +428,23 @@ export function App() {
           import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:3001`
         }
         onProtect={() => navigate("protect")}
+        onPlans={() => navigate("pricing")}
+      />
+    );
+  else if (route === "pricing")
+    page = (
+      <PricingPage
+        walletConnected={walletSession !== null}
+        onConnect={connectWallet}
+        onNavigate={(nextRoute) => navigate(nextRoute)}
+      />
+    );
+  else if (route === "reports")
+    page = (
+      <ReportsPage
+        connected={walletSession !== null}
+        onConnect={connectWallet}
+        onUpgrade={() => navigate("pricing")}
       />
     );
   else if (route === "bridge")

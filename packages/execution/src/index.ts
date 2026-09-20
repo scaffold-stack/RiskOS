@@ -80,6 +80,7 @@ export function planZestMainnetRepay(
   manifest: RegistryManifest | null,
   now = new Date(),
 ): TransactionIntent {
+  const debtLegCount = position.legs?.debt.length ?? 1;
   const amount = BigInt(amountAtomic);
   const debtAmount = BigInt(position.debt.amountAtomic);
   const maximumWithAccrualHeadroom = debtAmount + (debtAmount + 999n) / 1_000n;
@@ -89,6 +90,16 @@ export function planZestMainnetRepay(
   const debtContract = position.debt.contractPrincipal;
   const assetIdentifier = position.debt.assetIdentifier;
   const metadataReady = Boolean(market && debtContract?.includes(".") && assetIdentifier?.includes("::") && position.debt.protocolAssetId !== undefined);
+  const currentEvidence = position.provenance.some((item) => {
+    const observed = Date.parse(item.observedAt);
+    return (
+      item.blockHeight === stateBlock &&
+      Number.isFinite(observed) &&
+      observed <= now.getTime() + 1_000 &&
+      now.getTime() - observed <= 30_000
+    );
+  });
+  const positionEvidenceReady = position.confidence.state === "verified" && currentEvidence;
   const validAmount = amount > 0n && amount <= maximumWithAccrualHeadroom;
   const fullRepay = amount >= debtAmount;
   const collateralUsd = position.collateral.valueUsd === null ? null : decimalToScaled(position.collateral.valueUsd);
@@ -97,17 +108,31 @@ export function planZestMainnetRepay(
   const adjustedCollateral = collateralUsd === null ? null : collateralUsd * BigInt(position.parameters.liquidationThresholdBps) / 10_000n;
   const postHealthFactor = fullRepay ? "999" : adjustedCollateral === null || remainingDebtUsd === null
     ? null : ratioToDecimal(adjustedCollateral, remainingDebtUsd, 4);
+  const valuationEvidenceReady = [position.collateral.valuation, position.debt.valuation].every(
+    (valuation) =>
+      valuation !== undefined &&
+      valuation.source !== "fixture" &&
+      valuation.confidence >= 0.8 &&
+      Date.parse(valuation.observedAt) <= now.getTime() + 1_000 &&
+      now.getTime() - Date.parse(valuation.observedAt) <= 30_000,
+  );
   const meetsTarget = fullRepay || (postHealthFactor !== null && decimalToScaled(postHealthFactor, 4) >= 13_500n);
-  const ready = metadataReady && validAmount && meetsTarget;
+  const singleDebtLeg = debtLegCount === 1;
+  const ready = singleDebtLeg && metadataReady && positionEvidenceReady && validAmount && meetsTarget && (fullRepay || valuationEvidenceReady);
   const intentId = `int_${createHash("sha256").update(`${address}:${position.id}:${risk.riskId}:${amountAtomic}:${stateBlock}:${manifest?.version ?? "none"}`).digest("hex").slice(0, 20)}`;
   const debtSeparator = debtContract?.indexOf(".") ?? -1;
   const assetSeparator = assetIdentifier?.lastIndexOf("::") ?? -1;
   const postConditions = metadataReady ? [Pc.principal(address).willSendLte(amount).ft(assetIdentifier!.slice(0, assetSeparator) as `${string}.${string}`, assetIdentifier!.slice(assetSeparator + 2)) as unknown as Record<string, string>] : [];
-  const warnings = !market ? ["Active signed registry does not allowlist Zest v0.8 repay"]
+  const warnings = !singleDebtLeg ? ["This Zest account has multiple debt assets; select and simulate one debt leg before creating an executable repayment intent"]
+    : !market ? ["Active signed registry does not allowlist Zest v0.8 repay"]
     : !metadataReady ? ["Zest debt-token execution metadata is incomplete"]
+    : !positionEvidenceReady ? ["Canonical position evidence is not verified at the requested state block or is older than 30 seconds"]
     : !validAmount ? ["Repayment is outside the current debt plus 0.1% accrual headroom"]
+    : !fullRepay && !valuationEvidenceReady ? ["Partial repayment requires independently sourced collateral and debt prices no older than 30 seconds"]
     : !meetsTarget ? ["Partial repayment needs fresh valuation and must reach the 1.35 target health factor"]
-    : ["MAINNET SHADOW — payload is complete but wallet broadcast remains release-gated"];
+    : [
+        "MAINNET SHADOW — deterministic preflight passed, but no contract execution was broadcast or independently simulated",
+      ];
   const intent: TransactionIntent = {
     intentId: process.env.NODE_ENV === "test" ? intentId : `${intentId}_${randomUUID().slice(0, 8)}`,
     network: "mainnet", status: ready ? "ready" : "blocked",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import type {
@@ -10,7 +10,7 @@ import type {
   TransactionIntent,
   WalletSessionView,
 } from "../../../packages/domain/src/index.js";
-import { AppShell, type Route } from "./components/AppShell.js";
+import { AppShell, COMING_SOON_ROUTES, type Route } from "./components/AppShell.js";
 import { LoadingState } from "./components/Ui.js";
 import { BridgePage } from "./pages/BridgePage.js";
 import { LandingPage } from "./pages/LandingPage.js";
@@ -26,9 +26,8 @@ import {
   createWalletChallenge,
   getAlerts,
   getHealth,
-  getPortfolioSummary,
-  getPositions,
-  getRisks,
+  getAddressOverview,
+  getPortfolioHistory,
   getSbtcOperations,
   getWalletRequest,
   getWalletSession,
@@ -38,6 +37,7 @@ import {
   recordSubmission,
   verifyWalletChallenge,
   type SbtcOperationView,
+  type PortfolioHistoryResponse,
 } from "./api.js";
 import {
   connectRiskOSWallet,
@@ -84,7 +84,9 @@ function rememberAddress(address: string): void {
 function routeFromHash(): AppRoute {
   const value = window.location.hash.replace(/^#\/?/, "");
   if (!value || value === "landing") return "landing";
-  return routes.has(value as Route) ? (value as Route) : "overview";
+  if (!routes.has(value as Route)) return "overview";
+  if (COMING_SOON_ROUTES.has(value as Route)) return "overview";
+  return value as Route;
 }
 
 export function App() {
@@ -94,6 +96,7 @@ export function App() {
   const [positions, setPositions] = useState<PositionEnvelope | null>(null);
   const [risks, setRisks] = useState<RiskFinding[]>([]);
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [history, setHistory] = useState<PortfolioHistoryResponse | null>(null);
   const [intent, setIntent] = useState<TransactionIntent | null>(null);
   const [bridgeOperations, setBridgeOperations] = useState<SbtcOperationView[]>([]);
   const [bridgeLoaded, setBridgeLoaded] = useState(false);
@@ -109,6 +112,8 @@ export function App() {
   const [submitting, setSubmitting] = useState(false);
   const [submission, setSubmission] = useState<{ state: string; txid: string } | null>(null);
   const [modeLabel, setModeLabel] = useState("Read-only safety active");
+  const inspectGeneration = useRef(0);
+  const inspectAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const onHashChange = () => setRoute(routeFromHash());
@@ -153,30 +158,43 @@ export function App() {
   }, [submission]);
 
   useEffect(() => {
+    let cancelled = false;
     void getWalletSession()
       .then(async (session) => {
+        if (cancelled) return;
         setWalletSession(session);
         setAddress(session.address);
         setAddressDraft(session.address);
         const alerts = await getAlerts();
+        if (cancelled) return;
         setAlertRules(alerts.rules);
         setAlertOccurrences(alerts.occurrences);
         await inspect(session.address, false);
       })
       .catch(() => {
+        if (cancelled) return;
         const savedAddress = persistedAddress();
         if (savedAddress) void inspect(savedAddress, false);
       });
+    return () => {
+      cancelled = true;
+      inspectAbort.current?.abort();
+    };
   }, []);
 
   function navigate(nextRoute: Route) {
-    window.location.hash = nextRoute;
-    setRoute(nextRoute);
+    const resolved = COMING_SOON_ROUTES.has(nextRoute) ? "overview" : nextRoute;
+    window.location.hash = resolved;
+    setRoute(resolved);
   }
 
   async function inspect(nextAddress = addressDraft || address, notify = true) {
     const target = nextAddress.trim();
     if (!target) return;
+    inspectAbort.current?.abort();
+    const abort = new AbortController();
+    inspectAbort.current = abort;
+    const generation = ++inspectGeneration.current;
     setAddress(target);
     setAddressDraft(target);
     setLoading(true);
@@ -184,22 +202,30 @@ export function App() {
     setIntent(null);
     setBridgeLoaded(false);
     try {
-      const [nextPositions, nextRisks, nextSummary] = await Promise.all([
-        getPositions(target),
-        getRisks(target),
-        getPortfolioSummary(target),
-      ]);
-      setPositions(nextPositions);
-      setRisks(nextRisks.risks);
-      setSummary(nextSummary);
+      const overview = await getAddressOverview(target, abort.signal);
+      if (generation !== inspectGeneration.current) return;
+      setPositions(overview.positions);
+      setRisks(overview.risks);
+      setSummary(overview.portfolio);
+      setLoading(false);
       rememberAddress(target);
       if (notify) toast.success("Portfolio analysis updated", { toastId: "portfolio-analysis" });
+      void getPortfolioHistory(target, 30, abort.signal)
+        .then((nextHistory) => {
+          if (generation !== inspectGeneration.current) return;
+          setHistory(nextHistory);
+        })
+        .catch(() => {
+          if (generation !== inspectGeneration.current) return;
+          setHistory(null);
+        });
     } catch (cause) {
+      if (abort.signal.aborted || generation !== inspectGeneration.current) return;
       setPositions(null);
       setRisks([]);
       setSummary(null);
+      setHistory(null);
       setError(cause instanceof Error ? cause.message : "Unable to inspect address");
-    } finally {
       setLoading(false);
     }
   }
@@ -337,6 +363,7 @@ export function App() {
         positions={positions}
         risks={risks}
         summary={summary}
+        history={history}
         onInspect={() => void inspect()}
         onAddressDraftChange={setAddressDraft}
         onConnect={connectWallet}
@@ -346,7 +373,13 @@ export function App() {
     );
   else if (route === "positions")
     page = (
-      <PositionsPage envelope={positions} risks={risks} summary={summary} onInspect={() => void inspect()} />
+      <PositionsPage
+        envelope={positions}
+        risks={risks}
+        summary={summary}
+        history={history}
+        onInspect={() => void inspect()}
+      />
     );
   else if (route === "risk")
     page = (
@@ -430,9 +463,6 @@ export function App() {
       modeLabel={modeLabel}
       netWorthLabel={summary ? formatUsd(summary.totalAssetsUsd) : undefined}
       lastUpdatedAt={summary?.data.lastUpdatedAt}
-      warning={
-        summary ? [...new Set([...summary.data.warnings, ...(positions?.warnings ?? [])])][0] : undefined
-      }
       onWalletConnect={connectWallet}
       onWalletDisconnect={disconnectWallet}
     >

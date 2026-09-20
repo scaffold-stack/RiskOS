@@ -1,0 +1,952 @@
+{
+  "kind": "riskos.registry.release",
+  "reviews": [
+    {
+      "reviewer": "RiskOS engineering",
+      "reviewedAt": "2026-09-13T19:18:46.035Z",
+      "notes": "Allowlist canonical Bitflow stSTX/STX DLMM pool dlmm_10 after Bitflow mapping and Hiro interface/deployment verification."
+    },
+    {
+      "reviewer": "automated on-chain verification",
+      "reviewedAt": "2026-09-13T19:18:46.035Z",
+      "notes": "Allowlist canonical Bitflow stSTX/STX DLMM pool dlmm_10 after Bitflow mapping and Hiro interface/deployment verification."
+    }
+  ],
+  "registry": {
+    "manifest": {
+      "version": "2026-09-13.1",
+      "network": "mainnet",
+      "issuedAt": "2026-09-13T18:00:00.000Z",
+      "expiresAt": "2026-10-13T18:00:00.000Z",
+      "entries": [
+        {
+          "protocol": "sbtc",
+          "adapterVersion": "sbtc-token-clarity3-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+          "interfaceHash": "sha256:f44baa1c54656f3162a478fdf6dfb075ec167568f98b5f24ef78b86aae0cd5f0",
+          "activationBlock": 328228,
+          "supportedAssets": [
+            "sBTC",
+            "sBTC-locked"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token",
+              "symbol": "sBTC",
+              "decimals": 8,
+              "spendable": true
+            },
+            {
+              "assetIdentifier": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token-locked",
+              "symbol": "sBTC (protocol locked)",
+              "decimals": 8,
+              "spendable": false
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-balance-available",
+            "get-balance-locked",
+            "get-decimals",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/stacks-sbtc/sbtc/blob/main/contracts/contracts/sbtc-token.clar",
+            "https://explorer.hiro.so/txid/SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xead2080826685a98886891cbd9b288d367ae19b357353c71fff4a3330da582c8",
+          "enabled": true
+        },
+        {
+          "protocol": "sbtc",
+          "adapterVersion": "sbtc-bridge-clarity3-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-registry",
+          "interfaceHash": "sha256:6584d494be6563123cac7de42e123c7f265a9eec19493b09e2b045e24a166a96",
+          "activationBlock": 328228,
+          "supportedAssets": [
+            "sBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-completed-deposit",
+            "get-deposit-status",
+            "get-withdrawal-request",
+            "get-completed-withdrawal-sweep-data",
+            "get-current-signer-data"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/stacks-sbtc/sbtc/blob/main/contracts/contracts/sbtc-registry.clar",
+            "https://explorer.hiro.so/txid/SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-registry?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6eb6e597ee1395ca681163bf0596713beffb0bc554524f877824fc8af0b003b5",
+          "enabled": true
+        },
+        {
+          "protocol": "sbtc",
+          "adapterVersion": "sbtc-bridge-clarity3-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-deposit",
+          "interfaceHash": "sha256:d33832bbe22a60db209086587a0a3f7da25df8f58b1d5c5ef053058e7aa7067a",
+          "activationBlock": 328228,
+          "supportedAssets": [
+            "sBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-burn-header"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/stacks-sbtc/sbtc/blob/main/contracts/contracts/sbtc-deposit.clar",
+            "https://explorer.hiro.so/txid/SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-deposit?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x35bc565b91ab6377ae2c903ef44237573b4fc1998c0e11e5ea0cdda691079d25",
+          "enabled": true
+        },
+        {
+          "protocol": "sbtc",
+          "adapterVersion": "sbtc-bridge-clarity3-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-withdrawal",
+          "interfaceHash": "sha256:bd035fec6c27afe0c718d2d02e5cbf91fac73d16820581a3938123ba1511cab3",
+          "activationBlock": 328228,
+          "supportedAssets": [
+            "sBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-burn-header",
+            "validate-recipient"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/stacks-sbtc/sbtc/blob/main/contracts/contracts/sbtc-withdrawal.clar",
+            "https://explorer.hiro.so/txid/SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-withdrawal?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xc93cd38abe821180e4d3fd004285de15f73ba914b18acba7adc003163470df5a",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-repay-shadow-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-8-market",
+          "interfaceHash": "sha256:864b5b03a90813b9829c5eb61fd03d87413f78fd5b5b0f7b5df99843faea30c3",
+          "activationBlock": 8883545,
+          "supportedAssets": [
+            "STX",
+            "sBTC",
+            "stSTX",
+            "USDCx",
+            "USDH",
+            "stSTXbtc",
+            "stBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-pause-liquidation",
+            "get-stbtc-haircut-bps"
+          ],
+          "transactionFunctions": [
+            "repay"
+          ],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/README.md",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-8-market?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xeecc0fef6908f29fbffe1a280ce14020344552b78e182077e3ece00c54e1f7bd",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-market-vault",
+          "interfaceHash": "sha256:436e1e806558cd0a494f350b087412a2ac2ac20df3d64ab611e23c16f260b8bc",
+          "activationBlock": 6162076,
+          "supportedAssets": [],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-position",
+            "get-account-scaled-debt"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/market/v0-market-vault.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-market-vault?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6e1c6377dce29a1cfad6d5294861248e8433d1cabc446fcf330bc5cbf5dda1f1",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-assets",
+          "interfaceHash": "sha256:95550bfe620d0e11da09cb424753b11b9bf66ee84e1dc803ae4d186d81173337",
+          "activationBlock": 6162053,
+          "supportedAssets": [
+            "zvstBTC"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.zvstBTC::zvstbtc",
+              "symbol": "zvstBTC",
+              "decimals": 8,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-bitmap",
+            "get-status"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/registry/v0-assets.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-assets?chain=mainnet",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.zvstBTC?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6d638582861e3b3229fbca4f45c780a5f95b41a5dd1a2c1378d2693c9f725b5e",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-egroup",
+          "interfaceHash": "sha256:cba5996ee914358666909748f46da30f3959456595fc924a9cb94aba603b1888",
+          "activationBlock": 6162056,
+          "supportedAssets": [],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "resolve"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/registry/v0-egroup.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-egroup?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6202042124f18fd715de3231f9b90b2b51fe72f146c3fe14f0656d5b3e3266f2",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-stx",
+          "interfaceHash": "sha256:80b584f5cd0930f515b18cda840d88b38cd0e5cec4cd8a001cc16675bc9c90fd",
+          "activationBlock": 6162060,
+          "supportedAssets": [
+            "STX"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-stx.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-stx?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xc79a0fbdfcfced96bbdd28bfa7c67fd170179f45852a198c031b4d4183468277",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-sbtc",
+          "interfaceHash": "sha256:fdc4092dad1369d4ab2c182e539d0b5d778cbc11e7bc565eb748a2010fbda413",
+          "activationBlock": 6162063,
+          "supportedAssets": [
+            "sBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-sbtc.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-sbtc?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xcd49908f82f24c4ba7eb3d64887efed2696e258423770af40739e1e3b809eb49",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststx",
+          "interfaceHash": "sha256:cc44888be633fd4530d0f220bb3148fbcc6b28a9006ed3377af8f2601e780510",
+          "activationBlock": 6162066,
+          "supportedAssets": [
+            "stSTX",
+            "zstSTX"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststx::zft",
+              "symbol": "zstSTX",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-ststx.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststx?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xea8b170dde2a7b3e3f2be76ab27f14531ebd1ee86ce2e9747e6f349d2545a9de",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-usdc",
+          "interfaceHash": "sha256:fdc4092dad1369d4ab2c182e539d0b5d778cbc11e7bc565eb748a2010fbda413",
+          "activationBlock": 6162068,
+          "supportedAssets": [
+            "USDCx"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-usdc.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-usdc?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x78859082626c0bfca966a003e838000655ff3710deacfa55eba8d2b2d3d2f929",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-usdh",
+          "interfaceHash": "sha256:5ae8da618674c3bcf86701d55c50f84043709f03c77b61aefee74931bcc8ecb8",
+          "activationBlock": 6162072,
+          "supportedAssets": [
+            "USDH"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-usdh.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-usdh?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x8343b5db9da6ac1564fde5be715d8e1487cd9fa53cb19e42e1930e184f314b45",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststxbtc",
+          "interfaceHash": "sha256:4cd9023db68cd100d32553fa218574b923aa86a184fc99d11037c28bf2718d99",
+          "activationBlock": 6162074,
+          "supportedAssets": [
+            "stSTXbtc",
+            "zstSTXbtc"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststxbtc::zft",
+              "symbol": "zstSTXbtc",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-ststxbtc.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-ststxbtc?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x8553ba8f1d02d87998fb853cbec6cfb022412621342f2d3ea803452248908901",
+          "enabled": true
+        },
+        {
+          "protocol": "zest-v2",
+          "adapterVersion": "zest-v2-v0.8-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-stbtc",
+          "interfaceHash": "sha256:5fb87725ee82cb90bbf3546b165811a527f8b2ffe2b89b9cc14eb6ac082e849f",
+          "activationBlock": 8883541,
+          "supportedAssets": [
+            "stBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-next-index",
+            "get-interest-rate",
+            "get-utilization",
+            "get-fee-reserve",
+            "get-underlying",
+            "get-decimals",
+            "convert-to-assets"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/Zest-Protocol/zest-v2-contracts/blob/main/mainnet/contracts/vault/v0-vault-stbtc.clar",
+            "https://explorer.hiro.so/txid/SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-vault-stbtc?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x50b55ccc3c1ef1318608ac778eb4f77b170435a3d17d24826fae335988bb7333",
+          "enabled": true
+        },
+        {
+          "protocol": "stackingdao",
+          "adapterVersion": "stackingdao-data-stx-v2-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2",
+          "interfaceHash": "sha256:2633fa0e6d0d7c8a9f19a2f9f0a2e6cd171af109da39585d3c95f7b47879ee0c",
+          "activationBlock": 8712012,
+          "supportedAssets": [
+            "stSTX"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-stx-per-ststx"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/StackingDAO/stackingdao-smart-contracts/blob/main/mainnet/contracts/data-stx-v2.clar",
+            "https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stx-v2?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-07T15:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xadcc102a506edc9cf1a9399aabe425c0d45c4f8f550e200308fd9718a540208a",
+          "enabled": true
+        },
+        {
+          "protocol": "stackingdao",
+          "adapterVersion": "stackingdao-data-stbtc-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stbtc-v1",
+          "interfaceHash": "sha256:a68032ca47fca9f546354ffae4e8dfe6c41bfc8f63cf80d63fb82a5cebc9c88e",
+          "activationBlock": 8666689,
+          "supportedAssets": [
+            "stBTC"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-sbtc-per-stbtc"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/StackingDAO/stackingdao-smart-contracts/blob/main/mainnet/contracts/data/data-stbtc-v1.clar",
+            "https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.data-stbtc-v1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T08:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x22aa80c7d8673a838f82a78aae999297e7009fd1f5be1cf5d3a4b0e3ac0b73eb",
+          "enabled": true
+        },
+        {
+          "protocol": "stackingdao",
+          "adapterVersion": "stackingdao-ststx-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token",
+          "interfaceHash": "sha256:ddbf53a7d6978a8d2026fb0fee0b3e525871c75b996ed616d5f9bee14eefd237",
+          "activationBlock": 132118,
+          "supportedAssets": [
+            "stSTX"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token::ststx",
+              "symbol": "stSTX",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/StackingDAO/stackingdao-smart-contracts/blob/main/mainnet/contracts/tokens/ststx-token.clar",
+            "https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-10T16:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xe8fb4c8035f241f9679bef10214fb45cf4eb4ff6e82ad54b9355ae49829882e9",
+          "enabled": true
+        },
+        {
+          "protocol": "stackingdao",
+          "adapterVersion": "stackingdao-ststxbtc-token-v2-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token-v2",
+          "interfaceHash": "sha256:084d668c1843538713e1533f102a981dc18f6e89a2b077f8357152e299a89eb1",
+          "activationBlock": 1491293,
+          "supportedAssets": [
+            "stSTXbtc"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token-v2::ststxbtc",
+              "symbol": "stSTXbtc",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/StackingDAO/stackingdao-smart-contracts/blob/main/mainnet/contracts/tokens/ststxbtc-token-v2.clar",
+            "https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token-v2?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-10T16:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x3983edfafcbfbbb8e235db7cfe88bf642b982c5ea8fb36437f97663474303687",
+          "enabled": true
+        },
+        {
+          "protocol": "stackingdao",
+          "adapterVersion": "stackingdao-stbtc-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.stbtc-token",
+          "interfaceHash": "sha256:0552f48a4bc9a58db87a07111913636b458fe04cad3c4cfd572a78ded65c7772",
+          "activationBlock": 8666685,
+          "supportedAssets": [
+            "stBTC"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.stbtc-token::stbtc",
+              "symbol": "stBTC",
+              "decimals": 8,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/StackingDAO/stackingdao-smart-contracts/blob/main/mainnet/contracts/tokens/stbtc-token.clar",
+            "https://explorer.hiro.so/txid/SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.stbtc-token?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-10T16:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x0a7394aac82ddebc733bfeea2e0285f08a8827e9b46bceb0873b1f4f7df050e3",
+          "enabled": true
+        },
+        {
+          "protocol": "bitflow",
+          "adapterVersion": "bitflow-dlmm-api-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-sbtc-usdcx-v-1-bps-10",
+          "interfaceHash": "sha256:b09ede76c6204b5b76af8efb087122e26b56b3cafd237c402a4b06e2866e1830",
+          "activationBlock": 6909247,
+          "supportedAssets": [
+            "sBTC",
+            "USDCx"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-active-bin-id",
+            "get-bin-balances",
+            "get-user-bins",
+            "get-balance",
+            "get-overall-balance"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://bff.bitflowapis.finance/api/app/v1/pools/dlmm_1",
+            "https://explorer.hiro.so/txid/SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-sbtc-usdcx-v-1-bps-10?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-04T10:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xfbde371405f9d2832b8c4353a930796deef4212dee9e932ca6d9e926aeaddee5",
+          "enabled": true
+        },
+        {
+          "protocol": "bitflow",
+          "adapterVersion": "bitflow-dlmm-api-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-ststx-stx-v-1-bps-1",
+          "interfaceHash": "sha256:5de3e06b8aa132085fcafad3db11da6dc2e9228f97d077aad2793836a5f169f0",
+          "activationBlock": 8106227,
+          "supportedAssets": [
+            "stSTX",
+            "STX"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-active-bin-id",
+            "get-bin-balances",
+            "get-user-bins",
+            "get-balance",
+            "get-overall-balance"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://bff.bitflowapis.finance/api/app/v1/pools/dlmm_10",
+            "https://explorer.hiro.so/txid/SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-ststx-stx-v-1-bps-1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-13T18:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x55611e5af888812342b30f45b94970b9754fd60f241d4e5a93113916cefdf772",
+          "enabled": true
+        },
+        {
+          "protocol": "usdcx",
+          "adapterVersion": "usdcx-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx",
+          "interfaceHash": "sha256:de0354e6a5cc75a76a587c295c40cf676ec4d312dbe4e0321e74a810e4aff761",
+          "activationBlock": 5199972,
+          "supportedAssets": [
+            "USDCx"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx::usdcx-token",
+              "symbol": "USDCx",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://docs.stacks.co/learn/bridging/usdcx/contracts",
+            "https://explorer.hiro.so/txid/SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x07ea0a8d7262acd0cb094006969527351883281e08ebb6535843c5dbbde31ce9",
+          "enabled": true
+        },
+        {
+          "protocol": "hermetica",
+          "adapterVersion": "hermetica-usdh-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1",
+          "interfaceHash": "sha256:f65ebccb6d5485b5f1eb7b40d631a90b5f7476329e785e1e02b319c83c49e531",
+          "activationBlock": 166579,
+          "supportedAssets": [
+            "USDH"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1::usdh",
+              "symbol": "USDH",
+              "decimals": 8,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/hermetica-fi/hermetica-contracts",
+            "https://explorer.hiro.so/txid/SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.usdh-token-v1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6294eebb5e5560d8293268e2c28d3e9533d890007d8a573be80beb8b0db9ad49",
+          "enabled": true
+        },
+        {
+          "protocol": "hermetica",
+          "adapterVersion": "hermetica-susdh-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.susdh-token-v1",
+          "interfaceHash": "sha256:d6b2dfe1d789422dbd2dfb22501a9a9951aa1fb4f8408bb5941351cd2d2e527c",
+          "activationBlock": 166579,
+          "supportedAssets": [
+            "sUSDh"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.susdh-token-v1::susdh",
+              "symbol": "sUSDh",
+              "decimals": 8,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/hermetica-fi/hermetica-contracts",
+            "https://explorer.hiro.so/txid/SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.susdh-token-v1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x305ddcca63d76ce91aaf12ff4d56971237d05fe492cdfe5cb039a3c85c8bcda1",
+          "enabled": true
+        },
+        {
+          "protocol": "hermetica",
+          "adapterVersion": "hermetica-staking-v1-1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.staking-v1-1",
+          "interfaceHash": "sha256:ee894f41fe927b2a764d3a1c464eee358926c7b1fa70b7e190dc729441579c0b",
+          "activationBlock": 3567258,
+          "supportedAssets": [
+            "USDH",
+            "sUSDh"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-usdh-per-susdh"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/hermetica-fi/hermetica-contracts/blob/master/contracts/staking-v1-1.clar",
+            "https://explorer.hiro.so/txid/SPN5AKG35QZSK2M8GAMR4AFX45659RJHDW353HSG.staking-v1-1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x683803dd35164bec1cba4cc0d74174e8da2a47af88a5889e731e41f513228d8f",
+          "enabled": true
+        },
+        {
+          "protocol": "bitflow",
+          "adapterVersion": "bitflow-dlmm-api-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-usdh-usdcx-v-1-bps-1",
+          "interfaceHash": "sha256:b09ede76c6204b5b76af8efb087122e26b56b3cafd237c402a4b06e2866e1830",
+          "activationBlock": 7197510,
+          "supportedAssets": [
+            "USDH",
+            "USDCx"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-active-bin-id",
+            "get-bin-balances",
+            "get-user-bins",
+            "get-balance",
+            "get-overall-balance"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://bff.bitflowapis.finance/api/app/v1/pools/dlmm_8",
+            "https://explorer.hiro.so/txid/SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-usdh-usdcx-v-1-bps-1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x5d50fce9721553c549439b8cfe9cf31e6ba04632e090bdfe6e527158afee5306",
+          "enabled": true
+        },
+        {
+          "protocol": "granite",
+          "adapterVersion": "granite-aeusdc-token-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP3Y2ZSH8P7D50B0VBTSX11S7XSG24M1VB9YFQA4K.token-aeusdc",
+          "interfaceHash": "sha256:12b7003a36ce50ce69e810014f6a01e397adf16c53038481a2c54ec15dd9693e",
+          "activationBlock": 139967,
+          "supportedAssets": [
+            "aeUSDC"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP3Y2ZSH8P7D50B0VBTSX11S7XSG24M1VB9YFQA4K.token-aeusdc::aeUSDC",
+              "symbol": "aeUSDC",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-balance",
+            "get-decimals",
+            "get-symbol",
+            "get-total-supply"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/GraniteProtocol/config",
+            "https://explorer.hiro.so/txid/SP3Y2ZSH8P7D50B0VBTSX11S7XSG24M1VB9YFQA4K.token-aeusdc?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0x6ce20eca11e81455a85564d4114e2d682fd838ffa0d648192a29e19dcde9b36d",
+          "enabled": true
+        },
+        {
+          "protocol": "granite",
+          "adapterVersion": "granite-state-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.state-v1",
+          "interfaceHash": "sha256:c653f5822d39b49604872fea52e86f159363fd75a584fb6574ae6d9142e172d7",
+          "activationBlock": 503684,
+          "supportedAssets": [
+            "gUSDC",
+            "aeUSDC",
+            "sBTC"
+          ],
+          "assetDefinitions": [
+            {
+              "assetIdentifier": "SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.state-v1::lp-token",
+              "symbol": "gUSDC",
+              "decimals": 6,
+              "spendable": true
+            }
+          ],
+          "readOnlyFunctions": [
+            "get-user-position",
+            "get-user-collateral",
+            "get-collateral",
+            "get-debt-params",
+            "get-lp-params",
+            "convert-to-assets",
+            "get-balance",
+            "get-total-supply",
+            "get-decimals"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://github.com/GraniteProtocol/core-v1/blob/main/contracts/state-v1.clar",
+            "https://explorer.hiro.so/txid/SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.state-v1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xed8938ef65a208b975c88ba8e0133fab44bafa64d731367b94c3ef40a0e39c52",
+          "enabled": true
+        },
+        {
+          "protocol": "bitflow",
+          "adapterVersion": "bitflow-dlmm-api-v1-readonly-2026-09",
+          "network": "mainnet",
+          "contractPrincipal": "SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-aeusdc-usdcx-v-1-bps-1",
+          "interfaceHash": "sha256:b09ede76c6204b5b76af8efb087122e26b56b3cafd237c402a4b06e2866e1830",
+          "activationBlock": 6909262,
+          "supportedAssets": [
+            "aeUSDC",
+            "USDCx"
+          ],
+          "assetDefinitions": [],
+          "readOnlyFunctions": [
+            "get-active-bin-id",
+            "get-bin-balances",
+            "get-user-bins",
+            "get-balance",
+            "get-overall-balance"
+          ],
+          "transactionFunctions": [],
+          "evidenceUrls": [
+            "https://bff.bitflowapis.finance/api/app/v1/pools/dlmm_7",
+            "https://explorer.hiro.so/txid/SM1FKXGNZJWSTWDWXQZJNF7B5TV5ZB235JTCXYXKD.dlmm-pool-aeusdc-usdcx-v-1-bps-1?chain=mainnet"
+          ],
+          "reviewedAt": "2026-09-09T14:00:00.000Z",
+          "reviewer": "RiskOS engineering; automated on-chain verification",
+          "deploymentTransactionId": "0xdddde4adab7504e5226a1acc88bf1499e40f68d34e087b88617054a065d6d2e6",
+          "enabled": true
+        }
+      ]
+    },
+    "algorithm": "ed25519",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZCCQqh1VCRdQtz82+MZH3jTMjdgCdkrl0KCB2dWRfBg=\n-----END PUBLIC KEY-----\n",
+    "signatureBase64": "KrKgyzZC+PB/PaInulFl7tFElAvi2cT93jbCUatCfIlyhUkYFK9RNgoDWNNDU0OhodNWzCMWj2yrUv0Rl3LcAw=="
+  }
+}

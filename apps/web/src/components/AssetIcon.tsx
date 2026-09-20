@@ -23,6 +23,7 @@ export function AssetIcon({ asset, size = 32 }: { asset: string; size?: number }
 
 function artworkKey(asset: string): keyof typeof tokenArtwork | null {
   const normalized = assetIdentifierName(asset).toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (normalized.includes("zvstbtc")) return "stbtc";
   if (normalized.includes("zststxbtc")) return "zststxbtc";
   if (normalized.includes("zststx")) return "zststx";
   if (normalized.includes("zsbtc")) return "zsbtc";

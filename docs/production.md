@@ -6,10 +6,12 @@ Production live mode exposes registry-gated reads, canonical protocol projection
 
 ## Low-cost deployment
 
+See **[deploy-free.md](./deploy-free.md)** for the free-tier path (Fly + Neon + Cloudflare Pages).
+
 1. Deploy `apps/web` to Cloudflare Pages using `npm run build:web` and output directory `apps/web/dist`.
-2. Put the web app and API on HTTPS origins under the same registrable domain (for example `app.example.com` and `api.example.com`), replace the example API domain in `apps/web/public/_headers`, and set `VITE_API_URL` before building. The strict httpOnly wallet-session cookie intentionally will not cross unrelated `pages.dev` and `fly.dev` sites.
-3. Copy `infra/fly/api.fly.toml.example` to `fly.toml` and choose an app name and primary region.
-4. Provision Managed Postgres, attach it to the API, and set `WEB_ORIGIN`, distinct Chainhook/operations bearer tokens, and trusted registry-key fingerprints as secrets.
+2. Put the web app and API on HTTPS origins under the same registrable domain when wallet cookies are required (for example `app.example.com` and `api.example.com`), replace the API host in `apps/web/public/_headers`, and set `VITE_API_URL` before building. The strict httpOnly wallet-session cookie intentionally will not cross unrelated `pages.dev` and `fly.dev` sites.
+3. Use repo-root `fly.toml` (from `infra/fly/api.fly.toml.example`) and choose an app name and primary region.
+4. Provision Neon free Postgres (or Fly Managed Postgres), attach it to the API, and set `WEB_ORIGIN`, distinct Chainhook/operations bearer tokens, and trusted registry-key fingerprints as secrets via `./scripts/fly-secrets-from-env.sh`.
 5. Deploy the API with `fly deploy`; the release command applies versioned migrations.
 6. Verify and dual-review the mainnet candidate, sign it with the external release key, activate it through the operations endpoint, and retain the signed artifact outside the image.
 7. Configure `SBTC_EMILY_URL` and `BITCOIN_ESPLORA_URL`, then verify both dependency health and rate limits.
@@ -20,13 +22,42 @@ Production live mode exposes registry-gated reads, canonical protocol projection
    and confirmed Bitcoin deposit+sweep evidence to agree.
 9. Run the 100-address gate against an independently calculated reference deployment. Preserve and review the zero-mismatch artifact before public beta.
 
+## Projection backfill (production)
+
+Projection history is required for cash-flow attribution and sBTC lifecycle evidence.
+
+```sh
+# Apply migrations (includes paused checkpoint status)
+npm run db:migrate
+
+# Estimate remaining Hiro event pages (optional)
+npm run backfill:estimate
+
+# Exhaust every projection-capable contract (Zest market/vaults, Bitflow DLMM, sBTC registry).
+# Resumable: paused checkpoints continue from next_offset. Safe to re-run.
+npm run backfill:registry-events:complete
+
+# Or resume a subset:
+BACKFILL_CONTRACTS=SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-registry \
+BACKFILL_UNTIL_EXHAUSTED=1 BACKFILL_MAX_PAGES_PER_CONTRACT=400 \
+  npm run backfill:registry-events
+
+# Fail closed until every checkpoint is status=complete (not paused)
+npm run audit:projections
+```
+
+Bitflow DLMM pools can exceed hundreds of thousands of Hiro events; expect a multi-hour
+to multi-day resume loop. Zest vaults and the sBTC registry are typically smaller and
+should be exhausted first.
+
 ## Before public beta of protocol positions
 
 - Re-run two-source/on-chain verification for every candidate contract immediately before signing.
 - Backfill canonical Zest/Bitflow/sBTC projections from each registered activation block and review all `projection_issues`.
-- Use the resumable registry-event path (`npm run backfill:registry-events`) until
-  every registry checkpoint is complete, then require `npm run audit:projections`
-  to pass. The recent block-range command is not sufficient launch evidence.
+- Use the resumable registry-event path until every projection-capable checkpoint
+  is `status=complete` (exhausted Hiro pages), then require `npm run audit:projections`
+  to pass. Prefer `npm run backfill:registry-events:complete`. A `paused` checkpoint
+  is not production-ready. The recent block-range command is not sufficient launch evidence.
 - Obtain protocol-approved golden addresses and expected outputs.
 - Validate the signed-off fixture against the deployed candidate with
   `GOLDEN_ADDRESSES_PATH=... RISKOS_CANDIDATE_URL=... npm run gate:golden-addresses`.

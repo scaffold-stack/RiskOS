@@ -4,3 +4,6 @@ export * from "./registry-provider.js";
 export * from "./stacks-read-only-client.js";
 export * from "./zest-mainnet-adapter.js";
 export * from "./bitflow-mainnet-adapter.js";
+export * from "./granite-mainnet-adapter.js";
+export * from "./yield-market-catalog.js";
+export { mapWithConcurrency, createConcurrencyGate, stacksReadGate } from "./http-retry.js";

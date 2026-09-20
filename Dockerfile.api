@@ -14,6 +14,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY infra/postgres ./infra/postgres
 COPY scripts ./scripts
+COPY registry/mainnet/2026-09-13.1.signed.json ./registry/mainnet/2026-09-13.1.signed.json
 USER node
 EXPOSE 3001
 CMD ["node", "dist/apps/api/src/server.js"]

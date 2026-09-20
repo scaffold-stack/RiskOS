@@ -23,8 +23,8 @@ async function installTestWallet(page: import("@playwright/test").Page) {
 test("user can inspect risk and prepare a safe testnet action", async ({ page }) => {
   await installTestWallet(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /See the risk/ })).toBeVisible();
-  await page.getByRole("button", { name: /Open risk console/ }).click();
+  await expect(page.getByRole("heading", { name: /Know the capital/ })).toBeVisible();
+  await page.getByRole("button", { name: "Inspect a portfolio" }).click();
   await expect(page.getByRole("heading", { name: "Inspect a Stacks portfolio" })).toBeVisible();
   await expect(page.getByLabel("Portfolio address")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Connect wallet and analyze" })).toBeVisible();
@@ -39,7 +39,7 @@ test("user can inspect risk and prepare a safe testnet action", async ({ page })
   await expect(page.getByText("Estimated exit slippage exceeds 1%")).toBeVisible();
   await expect(page.getByText("What this means:")).toBeVisible();
   await page.getByRole("button", { name: "Protect", exact: true }).click();
-  await page.getByRole("button", { name: "Run repayment preflight" }).click();
+  await page.getByRole("button", { name: "Run preflight" }).click();
   await expect(page.getByRole("heading", { name: "Preflight passed" })).toBeVisible();
   await expect(page.getByText(/testnet ·/)).toBeVisible();
   await expect(page.getByText(/TESTNET FIXTURE ONLY/)).toBeVisible();
@@ -59,7 +59,16 @@ test("wallet owner can create evidence-backed alert rules", async ({ page }) => 
   await page.getByRole("button", { name: "Connect wallet" }).click();
   await page.getByRole("button", { name: /^Alerts/ }).click();
   await expect(page.getByRole("heading", { name: "Alerts" })).toBeVisible();
+  const createdRule = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" && response.url().endsWith("/v1/alerts/rules"),
+  );
   await page.getByRole("button", { name: "Create alert rule" }).click();
+  const createdRuleResponse = await createdRule;
+  expect(
+    createdRuleResponse.status(),
+    await createdRuleResponse.text(),
+  ).toBe(201);
   await expect(page.getByText("2 evidence-backed")).toBeVisible();
   await expect(page.getByText("Lending health factor is 1.0666")).toBeVisible();
 });
@@ -140,14 +149,14 @@ test("yield strategy engine discovers markets and chooses the split for the user
   await page.getByRole("button", { name: "Explore earning strategies" }).click();
 
   await expect(page.getByRole("heading", { name: "Explore yield strategies" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recommended yield split" })).toBeVisible();
-  await expect(page.getByText("Building an evidence-backed allocation…")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Simulated yield split" })).toBeVisible();
+  await expect(page.getByText("Building an evidence-labeled simulation…")).toBeVisible();
   await expect(page.getByText("$600,000.00")).toBeVisible();
   await expect(page.getByText("$400,000.00")).toBeVisible();
   await expect(page.getByText("$73,000.00")).toBeVisible();
   await expect(page.getByText(/Independent comparison: 6\.25%/)).toBeVisible();
-  await expect(page.getByText(/independently observed TVL/).first()).toBeVisible();
-  await expect(page.getByText("You do not choose the split.")).toBeVisible();
+  await expect(page.getByText(/maximum at 2% of reported TVL/).first()).toBeVisible();
+  await expect(page.getByText(/The split is optimized automatically/)).toBeVisible();
 });
 
 test("mobile navigation preserves the core dashboard routes", async ({ page }) => {

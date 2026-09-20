@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS registry_backfill_checkpoints (
   pages_completed integer NOT NULL DEFAULT 0 CHECK (pages_completed >= 0),
   events_seen bigint NOT NULL DEFAULT 0 CHECK (events_seen >= 0),
   transactions_ingested bigint NOT NULL DEFAULT 0 CHECK (transactions_ingested >= 0),
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'complete', 'failed')),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'paused', 'complete', 'failed')),
   last_error text,
   started_at timestamptz,
   completed_at timestamptz,

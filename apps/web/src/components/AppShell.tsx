@@ -21,10 +21,10 @@ const primary: Array<{ route: Route; label: string; icon: IconName }> = [
   { route: "positions", label: "Positions", icon: "positions" },
   { route: "risk", label: "Risk", icon: "risk" },
   { route: "protect", label: "Protect", icon: "protect" },
-  { route: "alerts", label: "Alerts", icon: "alerts" },
 ];
 
-const secondary: Array<{ route: Route; label: string; icon: IconName }> = [
+const comingSoon: Array<{ route: Route; label: string; icon: IconName }> = [
+  { route: "alerts", label: "Alerts", icon: "alerts" },
   { route: "markets", label: "Markets", icon: "markets" },
   { route: "bridge", label: "Bridge", icon: "bridge" },
   { route: "rewards", label: "Rewards", icon: "rewards" },
@@ -33,6 +33,8 @@ const secondary: Array<{ route: Route; label: string; icon: IconName }> = [
   { route: "integrations", label: "Integrations", icon: "integrations" },
   { route: "settings", label: "Settings", icon: "settings" },
 ];
+
+export const COMING_SOON_ROUTES = new Set<Route>(comingSoon.map((item) => item.route));
 
 interface AppShellProps {
   route: Route;
@@ -50,7 +52,6 @@ interface AppShellProps {
   modeLabel?: string | undefined;
   netWorthLabel?: string | undefined;
   lastUpdatedAt?: string | undefined;
-  warning?: string | undefined;
   onWalletConnect: () => void;
   onWalletDisconnect: () => void;
   children: ReactNode;
@@ -68,10 +69,9 @@ export function AppShell({
   walletConnected,
   walletBusy,
   portfolioActive,
-  alertCount,
+  alertCount: _alertCount,
   modeLabel = "Mainnet · advisory protect",
   lastUpdatedAt,
-  warning,
   onWalletConnect,
   onWalletDisconnect,
   children,
@@ -99,21 +99,23 @@ export function AppShell({
             >
               <Icon name={item.icon} />
               <span>{item.label}</span>
-              {item.route === "alerts" && alertCount > 0 ? <b className="nav-pill">{alertCount}</b> : null}
             </button>
           ))}
         </nav>
         <div className="nav-divider" />
-        <nav className="nav-block" aria-label="Secondary">
-          {secondary.map((item) => (
+        <nav className="nav-block" aria-label="Coming soon">
+          {comingSoon.map((item) => (
             <button
               key={item.route}
-              className={`nav-link ${route === item.route ? "active" : ""}`}
-              onClick={() => onRouteChange(item.route)}
-              aria-current={route === item.route ? "page" : undefined}
+              type="button"
+              className="nav-link coming-soon"
+              disabled
+              title="Coming soon"
+              aria-disabled="true"
             >
               <Icon name={item.icon} />
               <span>{item.label}</span>
+              <b className="nav-soon">Soon</b>
             </button>
           ))}
         </nav>
@@ -149,20 +151,35 @@ export function AppShell({
                     onInspect();
                   }}
                 >
-                  <input
-                    className="portfolio-select"
-                    value={addressDraft}
-                    onChange={(event) => onAddressDraftChange(event.target.value.trim())}
-                    aria-label="Stacks address"
-                    spellCheck={false}
-                  />
+                  <div className="inspect-input-wrap">
+                    <input
+                      className="portfolio-select"
+                      value={addressDraft}
+                      onChange={(event) => onAddressDraftChange(event.target.value)}
+                      aria-label="Stacks address"
+                      placeholder="SP… or SM…"
+                      spellCheck={false}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                    />
+                    <button
+                      className="copy-address"
+                      type="button"
+                      aria-label="Copy address"
+                      disabled={!addressDraft.trim()}
+                      onClick={() => void navigator.clipboard?.writeText(addressDraft.trim())}
+                    >
+                      <Icon name="copy" size={17} />
+                    </button>
+                  </div>
                   <button
-                    className="copy-address"
-                    type="button"
-                    aria-label="Copy address"
-                    onClick={() => void navigator.clipboard?.writeText(addressDraft)}
+                    className="btn primary small analyze-button"
+                    type="submit"
+                    disabled={!addressDraft.trim() || sourceState === "loading"}
                   >
-                    <Icon name="copy" size={17} />
+                    <Icon name="search" size={16} />
+                    {sourceState === "loading" ? "Analyzing…" : "Analyze"}
                   </button>
                 </form>
                 <div className="data-fresh">
@@ -182,12 +199,6 @@ export function AppShell({
                 </div>
               </div>
               <div className="top-right">
-                {warning ? (
-                  <div className="top-warning" title={warning}>
-                    <strong>!</strong>
-                    <span>{warning}</span>
-                  </div>
-                ) : null}
                 <button
                   className="btn secondary small refresh-button"
                   type="button"

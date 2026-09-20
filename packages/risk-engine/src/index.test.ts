@@ -53,4 +53,63 @@ describe("risk engine", () => {
     expect(finding?.score).toBeLessThan(30);
     expect(finding?.recommendedActions).toEqual([]);
   });
+
+  it("aggregates multi-leg collateral and debt while withholding a single liquidation price", () => {
+    const valuation = {
+      priceUsd: "100000",
+      source: "multi-source-consensus" as const,
+      observedAt: "2026-09-04T00:00:00.000Z",
+      ageSeconds: 10,
+      confidence: 0.95,
+      meaning: "test quorum",
+    };
+    const position = {
+      id: "zest-multi",
+      type: "lending" as const,
+      protocol: { id: "zest", version: "test", contract: "SP.TEST" },
+      collateral: {
+        asset: "sBTC",
+        amountAtomic: "100000000",
+        decimals: 8,
+        valueUsd: "100000",
+        valuation,
+      },
+      debt: {
+        asset: "USDCx",
+        amountAtomic: "20000000000",
+        decimals: 6,
+        valueUsd: "20000",
+        valuation: { ...valuation, priceUsd: "1" },
+      },
+      legs: {
+        collateral: [
+          { asset: "sBTC", amountAtomic: "100000000", decimals: 8, valueUsd: "100000", valuation },
+          { asset: "stBTC", amountAtomic: "50000000", decimals: 8, valueUsd: "50000", valuation },
+        ],
+        debt: [
+          {
+            asset: "USDCx",
+            amountAtomic: "20000000000",
+            decimals: 6,
+            valueUsd: "20000",
+            valuation: { ...valuation, priceUsd: "1" },
+          },
+        ],
+      },
+      parameters: { liquidationThresholdBps: 8000, maximumLtvBps: 7000 },
+      provenance: [{ source: "contract-read" as const, blockHeight: 1, observedAt: "2026-09-04T00:00:00.000Z" }],
+      confidence: { state: "verified" as const, score: 0.95, reasons: ["fixture multi-leg"] },
+    };
+    expect(lendingHealthFactor(position)).toBe("6");
+    expect(lendingLiquidationPriceUsd(position)).toBeNull();
+    expect(currentCollateralPriceUsd(position)).toBeNull();
+    const finding = evaluateRisks([position], new Date("2026-09-03T15:00:00Z"))[0];
+    expect(finding?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: "collateralValueUsd", value: "150000" }),
+        expect.objectContaining({ metric: "debtValueUsd", value: "20000" }),
+        expect.objectContaining({ metric: "estimatedLiquidationPriceUsd", value: "unknown" }),
+      ]),
+    );
+  });
 });

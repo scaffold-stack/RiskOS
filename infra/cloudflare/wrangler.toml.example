@@ -1,0 +1,13 @@
+# Cloudflare Pages project settings (free tier)
+# Build command: npm run build:web
+# Output directory: apps/web/dist
+# Root directory: repository root
+# Environment variables (Production):
+#   VITE_API_URL=https://riskosfolio-api.fly.dev
+
+name = "riskosfolio"
+compatibility_date = "2026-09-19"
+
+[vars]
+# Overridden at build time by Cloudflare Pages env; kept here as documentation.
+VITE_API_URL = "https://riskosfolio-api.fly.dev"

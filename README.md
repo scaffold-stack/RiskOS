@@ -17,7 +17,7 @@ RiskOS is a non-custodial, evidence-backed risk and protective-action layer for 
 - Reorg rollback with dependent snapshot invalidation
 - Ed25519-signed, versioned integration registry
 - Current Hiro v3 principal balances and v2 block reconciliation
-- On-chain verified sBTC, Zest v2, and Bitflow mainnet registry candidate
+- On-chain verified sBTC, Zest v2, Bitflow, Hermetica, and Granite mainnet registry candidate
 - Registry-gated Zest pinned-tip reads and Bitflow LP shadow reads
 - Reorg-aware Zest/Bitflow ownership and sBTC lifecycle projections
 - Canonical index-block-hash position snapshots and a strict 100-address comparison gate
@@ -33,12 +33,14 @@ RiskOS is a non-custodial, evidence-backed risk and protective-action layer for 
 - Overview / Positions / Risk / Protect / Bridge UI with Stacks brand colors (`#fc6432`, `#5546FF`, `#131416`)
 - Allocation donut, protocol bars, deployed-vs-idle split, LP range, liquidation distance, and protect before/after views
 - Fixture wallet idle + locked balances so deployed/idle/locked capital is demonstrable
-- Mainnet live reads with DIA/peg USD enrichment for positions, risk, and portfolio
+- Mainnet live reads with DIA plus Pyth/CoinGecko price-source agreement for positions, risk, and portfolio
+- Hermetica sUSDh valuation from the pinned USDh-per-sUSDh contract rate and independently bounded USDh/USD market evidence
+- Granite gUSDC valuation from pinned share-to-aeUSDC conversion, plus direct borrower collateral/debt-share discovery
 - Candidate registry bootstrap for local live mode (production still requires signed activation)
 - Advisory-only mainnet protect (shadow intents; broadcast disabled)
 - `@riskos/client` SDK and embeddable `RiskOsWidget` with Integrations preview page
 - Ed25519 dual-reviewed registry signing/activation (`registry:keygen|sign|activate`) with `REGISTRY_SIGNED_PATH` boot
-- Live pricing fail-closed on DIA + peg (no silent $100k fallback); portfolio BTC ref from DIA
+- Live pricing uses a 2-of-3 DIA/Pyth/fixed-ID CoinGecko quorum and fails closed without two agreeing sources; no silent static-price fallback
 - 100-address comparison gate + artifact (`npm run gate:100-addresses`)
 - Zest multi-asset legs + Bitflow Hiro NFT ownership reconcile
 - Docker Compose Postgres + Chainhook Hiro backfill script

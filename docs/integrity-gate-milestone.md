@@ -6,12 +6,13 @@ Close live-mode valuation stubs, ship the executable 100-address comparison arti
 
 ## Stub fixes (pricing integrity)
 
-- Live API uses **DIA + optional authenticated Pyth consensus + deployed Zest vault conversions + stablecoin peg** (no `StaticFallbackPriceBook`).
+- Live API uses **DIA + Pyth with fixed-ID CoinGecko fallback + deployed Zest vault conversions + Bitflow stablecoin markets** (no `StaticFallbackPriceBook`).
 - Enrichment **refuses** `source: "fixture"` quotes.
 - Portfolio `btcReferencePriceUsd` comes from DIA when available; otherwise `null` (never hardcoded `$100000`).
-- `/health.pricing` identifies whether Pyth consensus is enabled. When
-  `PYTH_HERMES_TOKEN` is set, BTC/STX quotes fail closed if either provider is
-  unavailable or divergence exceeds `PRICE_MAX_DIVERGENCE_BPS`.
+- `/health.pricing` identifies the configured quorum. Pyth is tried per feed;
+  denied or unavailable feeds fall back to CoinGecko, but still require DIA
+  agreement. Quotes fail closed if the selected reference or DIA is stale,
+  malformed, unavailable, or exceeds `PRICE_MAX_DIVERGENCE_BPS`.
 
 ## 100-address gate
 
@@ -38,12 +39,18 @@ RISKOS_REFERENCE_URL=https://reference.example \
 docker compose up -d postgres
 # uncomment DATABASE_URL in .env
 npm run db:migrate
-# Historical protocol events from every enabled registry contract. The command
-# checkpoints each contract and safely resumes on the next invocation.
+# Historical protocol events from projection-capable registry contracts only
+# (Zest market/vaults, Bitflow DLMM pools, sBTC registry). Token and read-only
+# oracle contracts are excluded because they do not decode into protocol projections.
+# The command checkpoints each contract and safely resumes on the next invocation.
+# Production requires exhaustion of every contract event page — use:
+#   npm run backfill:registry-events:complete
+# Bounded runs leave checkpoints in status=paused until resumed.
 npm run backfill:registry-events
+npm run backfill:estimate
 
-# Repeat until every contract reports complete, then fail closed on incomplete
-# checkpoints, canonical decode issues, or missing protocol projections.
+# Fail closed until every projection contract is status=complete (not paused),
+# with zest/bitflow/sbtc projections present and zero canonical decode issues.
 npm run audit:projections
 
 # Small recent block-range diagnostic only; not the activation-history backfill.

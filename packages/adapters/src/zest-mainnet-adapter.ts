@@ -31,7 +31,7 @@ const ASSET_SYMBOLS = [
   "stSTXbtc",
   "zstSTXbtc",
   "stBTC",
-  "zstBTC",
+  "zvstBTC",
 ] as const;
 const ERR_UNTRACKED_ACCOUNT = 600_006n;
 const DEBT_VAULTS = new Map<number, string>([
@@ -64,9 +64,73 @@ function ceilDiv(numerator: bigint, denominator: bigint) {
   return (numerator + denominator - 1n) / denominator;
 }
 
-function projectedDebt(amount: bigint, borrowAprBps: bigint, days: 7 | 30 | 90): bigint {
-  const denominator = BPS * SECONDS_PER_YEAR;
-  return ceilDiv(amount * (denominator + borrowAprBps * BigInt(days) * 86_400n), denominator);
+function projectDebt(amount: bigint, borrowAprBps: bigint, days: 7 | 30 | 90) {
+  const elapsed = BigInt(days) * 86_400n;
+  return ceilDiv(amount * (BPS * SECONDS_PER_YEAR + borrowAprBps * elapsed), BPS * SECONDS_PER_YEAR);
+}
+
+export async function readZestVaultRates(
+  pinned: Awaited<ReturnType<StacksReadOnlyClient["pinTip"]>>,
+  vault: { contractPrincipal: string; readOnlyFunctions: string[] },
+) {
+  const cacheKey = `${pinned.blockHeight}:${vault.contractPrincipal}`;
+  const cached = zestVaultRateCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const inFlight = zestVaultRateInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const load = (async () => {
+    requireReadFunctions(vault, ["get-interest-rate", "get-utilization", "get-fee-reserve"]);
+    // Sequential reads per vault — the shared stacksReadGate already caps global
+    // concurrency; firing three parallel calls per vault still stampedes under load.
+    const borrowRaw = await pinned.call(vault.contractPrincipal, "get-interest-rate", []);
+    const utilizationRaw = await pinned.call(vault.contractPrincipal, "get-utilization", []);
+    const reserveRaw = await pinned.call(vault.contractPrincipal, "get-fee-reserve", []);
+    const borrowAprBps = asUint(unwrapOk(borrowRaw));
+    const utilizationBps = asUint(unwrapOk(utilizationRaw));
+    const reserveFactorBps = asUint(unwrapOk(reserveRaw));
+    if (borrowAprBps > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Zest borrow APR exceeds safe range");
+    if (utilizationBps > BPS || reserveFactorBps > BPS)
+      throw new Error("Zest rate inputs exceed basis-point bounds");
+    const supplyAprBps = (borrowAprBps * utilizationBps * (BPS - reserveFactorBps)) / (BPS * BPS);
+    const value = {
+      borrowAprBps: Number(borrowAprBps),
+      supplyAprBps: Number(supplyAprBps),
+      utilizationBps: Number(utilizationBps),
+      reserveFactorBps: Number(reserveFactorBps),
+    };
+    zestVaultRateCache.set(cacheKey, { expiresAt: Date.now() + 60_000, value });
+    return value;
+  })();
+
+  zestVaultRateInFlight.set(cacheKey, load);
+  try {
+    return await load;
+  } finally {
+    zestVaultRateInFlight.delete(cacheKey);
+  }
+}
+
+type ZestVaultRates = {
+  borrowAprBps: number;
+  supplyAprBps: number;
+  utilizationBps: number;
+  reserveFactorBps: number;
+};
+
+const zestVaultRateCache = new Map<string, { expiresAt: number; value: ZestVaultRates }>();
+const zestVaultRateInFlight = new Map<string, Promise<ZestVaultRates>>();
+
+function requireReadFunctions(
+  entry: { contractPrincipal: string; readOnlyFunctions: string[] },
+  functions: string[],
+) {
+  const missing = functions.filter((name) => !entry.readOnlyFunctions.includes(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `active signed registry does not authorize ${entry.contractPrincipal}: ${missing.join(", ")}`,
+    );
+  }
 }
 
 /**
@@ -81,6 +145,7 @@ export async function discoverZestVerifiedAssets(
     entry.contractPrincipal.endsWith(".v0-assets"),
   );
   if (!assets) return [];
+  requireReadFunctions(assets, ["get-status"]);
   const pinned = await client.pinTip();
   const definitions: VerifiedAssetDefinition[] = [];
   // This registry changes rarely and is cached by the API. Resolve it
@@ -107,6 +172,16 @@ export async function discoverZestVerifiedAssets(
       symbol,
       decimals: Number(asUint(tupleField(status, "decimals"))),
       spendable: true,
+      ...(symbol.startsWith("z")
+        ? {
+            positionType: "supply" as const,
+            protocol: {
+              id: "zest",
+              version: assets.adapterVersion,
+              contract: contractPrincipal,
+            },
+          }
+        : {}),
     });
   }
   return definitions;
@@ -130,6 +205,9 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
     if (!market || !positionVault || !assets || !egroup) {
       throw new Error("active signed registry does not contain the required Zest v2 read contracts");
     }
+    requireReadFunctions(positionVault, ["get-position"]);
+    requireReadFunctions(assets, ["get-bitmap", "get-status"]);
+    requireReadFunctions(egroup, ["resolve"]);
 
     const pinned = await this.client.pinTip();
     const enabledMask = asUint(await pinned.call(assets.contractPrincipal, "get-bitmap", []));
@@ -154,6 +232,9 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
 
     const observedAt = new Date().toISOString();
     if (debtRaw.length === 0) {
+      // Supply-only wallets skip vault-rate reads here. Overview enrichment applies
+      // the shared yield catalog afterward so discovery does not compete with market
+      // discovery for the same read-only budget.
       return Promise.all(
         collateralRaw.map(async (leg): Promise<Position> => {
           const status = asTuple(
@@ -162,16 +243,8 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
           const vaultName = ASSET_VAULTS.get(leg.aid);
           const vault = vaultName ? byName.get(vaultName) : undefined;
           if (!vault) throw new Error(`active signed registry has no supply vault for Zest asset ${leg.aid}`);
-          const [borrowRateCv, utilizationCv, reserveCv] = await Promise.all([
-            pinned.call(vault.contractPrincipal, "get-interest-rate", []),
-            pinned.call(vault.contractPrincipal, "get-utilization", []),
-            pinned.call(vault.contractPrincipal, "get-fee-reserve", []),
-          ]);
-          const borrowAprBps = asUint(unwrapOk(borrowRateCv));
-          const utilizationBps = asUint(unwrapOk(utilizationCv));
-          const reserveFactorBps = asUint(unwrapOk(reserveCv));
-          const supplyAprBps = (((borrowAprBps * utilizationBps) / BPS) * (BPS - reserveFactorBps)) / BPS;
           const contractPrincipal = asPrincipal(tupleField(status, "addr"));
+          const assetIdentifier = await this.client.assetIdentifier(contractPrincipal).catch(() => undefined);
           return {
             id: `zest-v2:supply:${address}:${asUint(tupleField(rawPosition, "id"))}:${leg.aid}`,
             type: "supply",
@@ -183,28 +256,15 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
               valueUsd: null,
               protocolAssetId: leg.aid,
               contractPrincipal,
-              assetIdentifier: await this.client.assetIdentifier(contractPrincipal),
-            },
-            rates: {
-              supplyAprBps: Number(supplyAprBps),
-              utilizationBps: Number(utilizationBps),
-              reserveFactorBps: Number(reserveFactorBps),
-              observedAtBlock: pinned.blockHeight,
-            },
-            earnings: {
-              annualizedRateBps: Number(supplyAprBps),
-              rateKind: "supply-apr",
-              earnedToDateUsd: null,
-              observedAtBlock: pinned.blockHeight,
-              meaning:
-                "Projected interest uses the live variable supply APR. Earned-to-date requires a principal or deposit-history baseline.",
+              ...(assetIdentifier ? { assetIdentifier } : {}),
             },
             provenance: [{ source: "contract-read", blockHeight: pinned.blockHeight, observedAt }],
             confidence: {
               state: "verified",
-              score: 0.92,
+              score: 0.9,
               reasons: [
-                "Supply balance and live vault rate inputs were read at one pinned Stacks tip",
+                "Supply share balance was read from the allowlisted position contracts at one pinned Stacks tip",
+                "Current supply APR is attached later from the shared yield-market catalog",
                 "USD valuation is applied by the pricing service after discovery",
               ],
             },
@@ -218,89 +278,62 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
     );
     const liquidationThresholdBps = bufferToUint(tupleField(group, "LTV-LIQ-PARTIAL"));
     const maximumLtvBps = bufferToUint(tupleField(group, "LTV-BORROW"));
-    const collateralLegs = [];
-    for (const leg of collateralRaw) {
-      const status = asTuple(
-        unwrapOk(await pinned.call(assets.contractPrincipal, "get-status", [uintCV(leg.aid)])),
-      );
-      collateralLegs.push({
-        asset: ASSET_SYMBOLS[leg.aid] ?? `zest-asset-${leg.aid}`,
-        amountAtomic: leg.amount.toString(),
-        decimals: Number(asUint(tupleField(status, "decimals"))),
-        valueUsd: null as string | null,
-        protocolAssetId: leg.aid,
-        contractPrincipal: asPrincipal(tupleField(status, "addr")),
-      });
-    }
+    const collateralLegs = await Promise.all(
+      collateralRaw.map(async (leg) => {
+        const status = asTuple(
+          unwrapOk(await pinned.call(assets.contractPrincipal, "get-status", [uintCV(leg.aid)])),
+        );
+        return {
+          asset: ASSET_SYMBOLS[leg.aid] ?? `zest-asset-${leg.aid}`,
+          amountAtomic: leg.amount.toString(),
+          decimals: Number(asUint(tupleField(status, "decimals"))),
+          valueUsd: null as string | null,
+          protocolAssetId: leg.aid,
+          contractPrincipal: asPrincipal(tupleField(status, "addr")),
+        };
+      }),
+    );
 
-    const debtLegs = [];
-    for (const leg of debtRaw) {
-      const status = asTuple(
-        unwrapOk(await pinned.call(assets.contractPrincipal, "get-status", [uintCV(leg.aid)])),
-      );
-      const debtVaultName = DEBT_VAULTS.get(leg.aid);
-      const debtVault = debtVaultName ? byName.get(debtVaultName) : undefined;
-      if (!debtVault) throw new Error(`active signed registry has no debt vault for Zest asset ${leg.aid}`);
-      const borrowIndex = asUint(
-        unwrapOk(await pinned.call(debtVault.contractPrincipal, "get-next-index", [])),
-      );
-      const debtAmount = ceilDiv(leg.scaled * borrowIndex, INDEX_PRECISION);
-      const debtContract = asPrincipal(tupleField(status, "addr"));
-      debtLegs.push({
-        asset: ASSET_SYMBOLS[leg.aid] ?? `zest-asset-${leg.aid}`,
-        amountAtomic: debtAmount.toString(),
-        decimals: Number(asUint(tupleField(status, "decimals"))),
-        valueUsd: null as string | null,
-        protocolAssetId: leg.aid,
-        contractPrincipal: debtContract,
-        assetIdentifier: await this.client.assetIdentifier(debtContract),
-      });
-    }
+    const debtResults = await Promise.all(
+      debtRaw.map(async (leg) => {
+        const status = asTuple(
+          unwrapOk(await pinned.call(assets.contractPrincipal, "get-status", [uintCV(leg.aid)])),
+        );
+        const debtVaultName = DEBT_VAULTS.get(leg.aid);
+        const debtVault = debtVaultName ? byName.get(debtVaultName) : undefined;
+        if (!debtVault) throw new Error(`active signed registry has no debt vault for Zest asset ${leg.aid}`);
+        requireReadFunctions(debtVault, ["get-next-index"]);
+        const [borrowIndexRaw, rates] = await Promise.all([
+          pinned.call(debtVault.contractPrincipal, "get-next-index", []).then((raw) => asUint(unwrapOk(raw))),
+          readZestVaultRates(pinned, debtVault),
+        ]);
+        const debtAmount = ceilDiv(leg.scaled * borrowIndexRaw, INDEX_PRECISION);
+        const debtContract = asPrincipal(tupleField(status, "addr"));
+        let debtAssetIdentifier: string | undefined;
+        try {
+          debtAssetIdentifier = await this.client.assetIdentifier(debtContract);
+        } catch {
+          // Native STX debt is identified by the signed Zest asset registry and
+          // contract principal; its wrapper need not expose a SIP-010 token.
+        }
+        return {
+          rates,
+          leg: {
+            asset: ASSET_SYMBOLS[leg.aid] ?? `zest-asset-${leg.aid}`,
+            amountAtomic: debtAmount.toString(),
+            decimals: Number(asUint(tupleField(status, "decimals"))),
+            valueUsd: null as string | null,
+            protocolAssetId: leg.aid,
+            contractPrincipal: debtContract,
+            ...(debtAssetIdentifier ? { assetIdentifier: debtAssetIdentifier } : {}),
+          } satisfies Extract<Position, { type: "lending" }>["debt"],
+        };
+      }),
+    );
+    const debtLegs = debtResults.map((item) => item.leg);
+    const primaryRates = debtResults[0]?.rates;
 
     const multiAsset = collateralLegs.length > 1 || debtLegs.length > 1;
-    const debtVaultName = DEBT_VAULTS.get(debtRaw[0]!.aid);
-    const collateralVaultName = ASSET_VAULTS.get(collateralRaw[0]!.aid);
-    const rateVault = debtVaultName ? byName.get(debtVaultName) : undefined;
-    const supplyVault = collateralVaultName ? byName.get(collateralVaultName) : undefined;
-    let rates;
-    if (rateVault && supplyVault) {
-      const [
-        borrowRateCv,
-        utilizationCv,
-        reserveCv,
-        supplyBorrowRateCv,
-        supplyUtilizationCv,
-        supplyReserveCv,
-      ] = await Promise.all([
-        pinned.call(rateVault.contractPrincipal, "get-interest-rate", []),
-        pinned.call(rateVault.contractPrincipal, "get-utilization", []),
-        pinned.call(rateVault.contractPrincipal, "get-fee-reserve", []),
-        pinned.call(supplyVault.contractPrincipal, "get-interest-rate", []),
-        pinned.call(supplyVault.contractPrincipal, "get-utilization", []),
-        pinned.call(supplyVault.contractPrincipal, "get-fee-reserve", []),
-      ]);
-      const borrowAprBps = asUint(unwrapOk(borrowRateCv));
-      const utilizationBps = asUint(unwrapOk(utilizationCv));
-      const reserveFactorBps = asUint(unwrapOk(reserveCv));
-      const supplyBorrowAprBps = asUint(unwrapOk(supplyBorrowRateCv));
-      const supplyUtilizationBps = asUint(unwrapOk(supplyUtilizationCv));
-      const supplyReserveFactorBps = asUint(unwrapOk(supplyReserveCv));
-      const supplyAprBps =
-        (((supplyBorrowAprBps * supplyUtilizationBps) / BPS) * (BPS - supplyReserveFactorBps)) / BPS;
-      const primaryDebt = BigInt(debtLegs[0]!.amountAtomic);
-      rates = {
-        borrowAprBps: Number(borrowAprBps),
-        supplyAprBps: Number(supplyAprBps),
-        utilizationBps: Number(utilizationBps),
-        reserveFactorBps: Number(reserveFactorBps),
-        observedAtBlock: pinned.blockHeight,
-        debtProjections: ([7, 30, 90] as const).map((days) => ({
-          days,
-          amountAtomic: projectedDebt(primaryDebt, borrowAprBps, days).toString(),
-          assumption: `Current ${Number(borrowAprBps) / 100}% variable borrow APR remains unchanged`,
-        })),
-      };
-    }
     return [
       {
         id: `zest-v2:lending:${address}:${asUint(tupleField(rawPosition, "id"))}`,
@@ -310,13 +343,32 @@ export class ZestMainnetAdapter implements ProtocolAdapter {
         debt: debtLegs[0]!,
         legs: { collateral: collateralLegs, debt: debtLegs },
         parameters: { liquidationThresholdBps, maximumLtvBps },
-        ...(rates ? { rates } : {}),
+        ...(primaryRates
+          ? {
+              rates: {
+                ...primaryRates,
+                observedAtBlock: pinned.blockHeight,
+                debtProjections: ([7, 30, 90] as const).map((days) => ({
+                  days,
+                  amountAtomic: projectDebt(
+                    BigInt(debtLegs[0]!.amountAtomic),
+                    BigInt(primaryRates!.borrowAprBps),
+                    days,
+                  ).toString(),
+                  assumption: `Deterministic simple-interest projection at the pinned ${primaryRates.borrowAprBps}-bps variable borrow APR; rate changes are not forecast`,
+                })),
+              },
+            }
+          : {}),
         provenance: [{ source: "contract-read" as const, blockHeight: pinned.blockHeight, observedAt }],
         confidence: {
-          state: multiAsset ? ("degraded" as const) : ("verified" as const),
-          score: multiAsset ? 0.85 : 0.92,
+          // Multi-leg accounts are still pinned contract reads — labeling them
+          // "degraded" falsely suppresses exact portfolio totals for common Zest books.
+          state: "verified" as const,
+          score: multiAsset ? 0.88 : 0.92,
           reasons: [
             "Position, asset parameters, egroup, and debt index were read at one pinned Stacks tip",
+            "Borrow and supply APR inputs were read from the allowlisted debt vault at the same pinned Stacks tip",
             ...(multiAsset
               ? [
                   `Normalized ${collateralLegs.length} collateral and ${debtLegs.length} debt legs; primary repay leg is ${debtLegs[0]!.asset}`,

@@ -6,6 +6,91 @@ info:
 servers:
   - url: https://api.riskos.example
 paths:
+  /v1/address/{address}/history:
+    get:
+      summary: Read canonical position observations
+      description: Returns only non-invalidated snapshots and protocol cash flows bound to canonical index-block hashes. Observation payloads omit full position objects for speed; valued aggregates remain. It never derives earned yield from value changes alone.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          description: Maximum canonical observations (blocks), never raw position rows.
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+      responses:
+        "200":
+          description: Canonical observations and earned-yield reconciliation readiness
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [address, observations, cashFlows, integrity, earnedYield]
+                properties:
+                  address: { type: string }
+                  observations:
+                    type: array
+                    items:
+                      type: object
+                      required: [indexBlockHash, blockHeight, observedAt, registryVersion, positions, valuedPositionCount, excludedPositionCount, complete]
+                      properties:
+                        indexBlockHash: { type: string }
+                        blockHeight: { type: integer }
+                        observedAt: { type: string, format: date-time }
+                        registryVersion: { type: string }
+                        positions: { type: array, items: { $ref: "#/components/schemas/Position" } }
+                        valuedNetSubtotalUsd: { type: [string, "null"] }
+                        valuedAssetsSubtotalUsd: { type: [string, "null"] }
+                        valuedDebtSubtotalUsd: { type: [string, "null"] }
+                        valuedPositionCount: { type: integer, minimum: 0 }
+                        excludedPositionCount: { type: integer, minimum: 0 }
+                        complete: { type: boolean }
+                  cashFlows: { type: array, items: { type: object } }
+                  integrity: { type: object }
+                  earnedYield: { type: object }
+        "503":
+          description: Canonical history storage is not configured
+  /v1/yield/markets:
+    get:
+      operationId: getYieldMarkets
+      summary: Discover the signed-registry earning market universe
+      description: Reads current Zest vault rates at one pinned Stacks tip and reconciles exact underlying contracts, base yield, and capacity against a separately operated market dataset. It also observes allowlisted Bitflow APR/TVL and the official Hermetica sUSDh realized-APY feed, but provider-only observations cannot drive allocations. Markets without usable evidence remain visible but ineligible.
+      responses:
+        "200":
+          description: Current evidence-labeled market catalog
+        "502": { $ref: "#/components/responses/Problem" }
+  /v1/yield/allocations:
+    post:
+      operationId: createYieldAllocation
+      summary: Simulate or recommend a hypothetical yield split
+      description: >
+        Allocates hypothetical capital across allowlisted markets. mode=explore (default) builds an
+        evidence-labeled simulation that may include provider-reported and on-chain rates without
+        independent corroboration. mode=recommend stays fail-closed and only uses independently
+        corroborated rates with capacity evidence. Rates are never invented; zero and unavailable
+        markets remain visible as excluded. This endpoint does not create executable intents.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capitalUsd, days]
+              properties:
+                capitalUsd:
+                  type: string
+                  minLength: 1
+                  maxLength: 16
+                  pattern: '^\d+(?:\.\d{0,2})?$'
+                  description: Positive USD amount no greater than 1,000,000,000,000.00.
+                days: { enum: [30, 90, 365] }
+                mode: { enum: [explore, recommend], default: explore }
+      responses:
+        "200":
+          description: Automatic allocation, projections, source labels, policy constraints, and excluded markets
+        "400": { $ref: "#/components/responses/Problem" }
+        "502": { $ref: "#/components/responses/Problem" }
   /health:
     get:
       operationId: getHealth
@@ -22,6 +107,30 @@ paths:
                   dataMode: { enum: [fixture, live] }
                   execution: { type: string }
                   time: { type: string, format: date-time }
+  /v1/address/{address}/overview:
+    get:
+      summary: Inspect positions, risks, and portfolio in one discovery pass
+      description: >
+        Coalesces the live address read so the UI does not pay for three independent
+        discoveries. History remains a separate lightweight endpoint.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Positions envelope plus derived risks and portfolio summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [address, positions, risks, portfolio]
+                properties:
+                  address: { type: string }
+                  positions: { type: object }
+                  risks: { type: array }
+                  portfolio: { type: object }
   /v1/address/{address}/positions:
     get:
       operationId: getAddressPositions
@@ -401,16 +510,30 @@ components:
         amountAtomic: { type: string, pattern: "^[0-9]+$" }
         decimals: { type: integer, minimum: 0 }
         valueUsd: { type: [string, "null"], pattern: "^-?[0-9]+(\\.[0-9]+)?$" }
+        valuation:
+          type: object
+          description: Exact price observation used to calculate valueUsd. Absent when valueUsd is null.
+          required: [priceUsd, source, observedAt, ageSeconds, confidence, meaning]
+          properties:
+            priceUsd: { type: string, pattern: "^-?[0-9]+(\\.[0-9]+)?$" }
+            source: { enum: [dia, pyth, coingecko, coinbase, dia-pyth-consensus, multi-source-consensus, bitflow-market, stackingdao-rate, hermetica-rate, granite-rate, zest-vault, fixture] }
+            observedAt: { type: string, format: date-time }
+            ageSeconds: { type: [integer, "null"], minimum: 0 }
+            confidence: { type: number, minimum: 0, maximum: 1 }
+            meaning: { type: string }
     EarningsEvidence:
       type: object
       description: Annualized yield evidence. Earned-to-date remains null until a principal or cost-basis checkpoint is reconciled.
-      required: [annualizedRateBps, rateKind, earnedToDateUsd, observedAtBlock, meaning]
+      required:
+        [annualizedRateBps, rateKind, earnedToDateUsd, observedAtBlock, meaning, provenance, confidence]
       properties:
-        annualizedRateBps: { type: [integer, "null"], minimum: 0 }
-        rateKind: { enum: [supply-apr, provider-apy] }
+        annualizedRateBps: { type: [integer, "null"], minimum: -10000 }
+        rateKind: { enum: [supply-apr, provider-apy, realized-apy] }
         earnedToDateUsd: { type: [string, "null"], pattern: "^-?[0-9]+(\\.[0-9]+)?$" }
-        observedAtBlock: { type: integer, minimum: 0 }
+        observedAtBlock: { type: [integer, "null"], minimum: 0 }
         meaning: { type: string }
+        provenance: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Provenance" } }
+        confidence: { $ref: "#/components/schemas/Confidence" }
     PositionEnvelope:
       type: object
       required: [address, asOf, positions, warnings]
@@ -597,6 +720,21 @@ components:
         headline: { type: string }
         centralAnswer: { type: object }
         totalAssetsUsd: { type: [string, "null"] }
+        verifiedSubtotalUsd:
+          type: [string, "null"]
+          description: Net value of only positions whose quantities and every monetary leg pass verification. This is not the complete portfolio total when data.state is partial.
+        verifiedSubtotalPositionCount: { type: integer, minimum: 0 }
+        valuedSubtotalUsd:
+          type: [string, "null"]
+          description: Net subtotal for positions with accepted non-fixture price evidence. Quantity evidence may be estimated, so this is not labelled verified.
+        valuedSubtotalPositionCount: { type: integer, minimum: 0 }
+        valuedAssetsSubtotalUsd: { type: [string, "null"] }
+        valuedDebtSubtotalUsd: { type: [string, "null"] }
+        valuedDeployedSubtotalUsd: { type: [string, "null"] }
+        valuedIdleSubtotalUsd: { type: [string, "null"] }
+        valuedLockedSubtotalUsd: { type: [string, "null"] }
+        valuedBtcExposureSubtotalUsd: { type: [string, "null"] }
+        valuedNetVsBtcExposureUsd: { type: [string, "null"] }
         totalDebtUsd: { type: [string, "null"] }
         netWorthUsd: { type: [string, "null"] }
         deployedUsd: { type: [string, "null"] }
@@ -605,7 +743,20 @@ components:
         allocations: { type: array, items: { type: object } }
         protocols: { type: array, items: { type: object } }
         deployment: { type: object }
-        scenarios: { type: array, items: { type: object } }
+        scenarios:
+          type: array
+          items:
+            type: object
+            required: [name, shock, estimatedNetValueUsd, estimatedLossUsd, positionsAffected, scope, excludedPositionCount, explanation]
+            properties:
+              name: { type: string }
+              shock: { type: string }
+              estimatedNetValueUsd: { type: [string, "null"] }
+              estimatedLossUsd: { type: [string, "null"] }
+              positionsAffected: { type: integer, minimum: 0 }
+              scope: { enum: [complete-portfolio, valued-subset] }
+              excludedPositionCount: { type: integer, minimum: 0 }
+              explanation: { type: string }
         metricMeanings: { type: array, items: { type: object } }
         data: { type: object }
     TransactionIntent:

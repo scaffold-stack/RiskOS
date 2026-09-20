@@ -6,6 +6,25 @@ import type { RegistryManifest } from "./registry.js";
 
 export type ProjectionProtocol = "zest" | "bitflow" | "sbtc";
 
+export const PROJECTION_PROTOCOLS: readonly ProjectionProtocol[] = ["zest", "bitflow", "sbtc"];
+
+/** Registry contracts whose historical events decode into protocol_projection_events. */
+export function isProjectionBackfillContract(entry: RegistryManifest["entries"][number]): boolean {
+  if (!entry.enabled) return false;
+  if (entry.protocol.startsWith("zest")) {
+    return entry.contractPrincipal.endsWith(".v0-market-vault")
+      || entry.contractPrincipal.endsWith(".v0-8-market")
+      || entry.contractPrincipal.includes(".v0-vault-");
+  }
+  if (entry.protocol === "bitflow") return entry.contractPrincipal.includes(".dlmm-pool-");
+  if (entry.protocol === "sbtc") return entry.contractPrincipal.endsWith(".sbtc-registry");
+  return false;
+}
+
+export function projectionBackfillContracts(manifest: RegistryManifest): RegistryManifest["entries"] {
+  return manifest.entries.filter(isProjectionBackfillContract);
+}
+
 export interface ProtocolProjection {
   projectionId: string;
   sourceEventKey: string;
@@ -134,8 +153,38 @@ function decodeZest(
   if (!hex) throw new Error("Zest print event has no Clarity value hex");
   const root = tuple(hexToCV(hex));
   const kind = text(field(root, "action"));
-  if (!new Set(["collateral-add", "collateral-remove", "debt-add-scaled", "debt-remove-scaled"]).has(kind)) return null;
   const data = tuple(field(root, "data"));
+  if (kind === "deposit") {
+    const ownerAddress = principal(field(data, "recipient"));
+    return complete({
+      ...common,
+      kind: "vault-deposit",
+      ownerAddress,
+      positionKey: `zest:${ownerAddress}:vault:${event.contractIdentifier}`,
+      payload: {
+        vaultContract: event.contractIdentifier,
+        underlyingAmountAtomic: uint(field(data, "amount")),
+        sharesMintedAtomic: uint(field(data, "shares-minted")),
+        depositor: principal(field(data, "depositor")),
+      },
+    });
+  }
+  if (kind === "redeem") {
+    const ownerAddress = principal(field(data, "recipient"));
+    return complete({
+      ...common,
+      kind: "vault-redeem",
+      ownerAddress,
+      positionKey: `zest:${ownerAddress}:vault:${event.contractIdentifier}`,
+      payload: {
+        vaultContract: event.contractIdentifier,
+        underlyingAmountAtomic: uint(field(data, "amount-received")),
+        sharesBurnedAtomic: uint(field(data, "shares-burned")),
+        redeemer: principal(field(data, "redeemer")),
+      },
+    });
+  }
+  if (!new Set(["collateral-add", "collateral-remove", "debt-add-scaled", "debt-remove-scaled"]).has(kind)) return null;
   const ownerAddress = principal(field(data, "account"));
   const isDebt = kind.startsWith("debt-");
   const payload: Record<string, unknown> = {
@@ -237,8 +286,9 @@ export function projectProtocolEvents(
   const zestContracts = enabled.filter((entry) => entry.protocol.startsWith("zest") && (
     entry.contractPrincipal.endsWith(".v0-market-vault")
     || entry.contractPrincipal.endsWith(".v0-8-market")
+    || entry.contractPrincipal.includes(".v0-vault-")
   ));
-  const bitflow = enabled.find((entry) => entry.protocol === "bitflow" && entry.contractPrincipal.includes(".dlmm-pool-"));
+  const bitflowPools = enabled.filter((entry) => entry.protocol === "bitflow" && entry.contractPrincipal.includes(".dlmm-pool-"));
   const sbtc = enabled.find((entry) => entry.protocol === "sbtc" && entry.contractPrincipal.endsWith(".sbtc-registry"));
   const sbtcToken = enabled.find((entry) => entry.protocol === "sbtc" && entry.contractPrincipal.endsWith(".sbtc-token"));
   const projections: ProtocolProjection[] = [];
@@ -251,10 +301,15 @@ export function projectProtocolEvents(
     try {
       let decoded: ProtocolProjection | null = null;
       const zest = zestContracts.find((entry) => event.contractIdentifier === entry.contractPrincipal);
+      const bitflow = bitflowPools.find(
+        (entry) =>
+          event.contractIdentifier === entry.contractPrincipal ||
+          assetIdentifier(event) === `${entry.contractPrincipal}::pool-token-id`,
+      );
       if (zest) {
         protocol = "zest"; adapterVersion = zest.adapterVersion;
         decoded = decodeZest(base(network, block, tx, event, protocol, adapterVersion), event);
-      } else if (bitflow && (event.contractIdentifier === bitflow.contractPrincipal || assetIdentifier(event) === `${bitflow.contractPrincipal}::pool-token-id`)) {
+      } else if (bitflow) {
         protocol = "bitflow"; adapterVersion = bitflow.adapterVersion;
         decoded = decodeBitflow(base(network, block, tx, event, protocol, adapterVersion), event, bitflow.contractPrincipal);
       } else if (sbtc && event.contractIdentifier === sbtc.contractPrincipal) {

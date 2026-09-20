@@ -26,14 +26,26 @@ const assetAmountSchema = z.object({
   protocolAssetId: z.number().int().nonnegative().optional(),
   contractPrincipal: z.string().optional(),
   assetIdentifier: z.string().optional(),
+  valuation: z
+    .object({
+      priceUsd: decimalStringSchema,
+      source: z.enum(["dia", "pyth", "coingecko", "coinbase", "dia-pyth-consensus", "multi-source-consensus", "bitflow-market", "stackingdao-rate", "hermetica-rate", "granite-rate", "zest-vault", "fixture"]),
+      observedAt: z.string().datetime(),
+      ageSeconds: z.number().int().nonnegative().nullable(),
+      confidence: z.number().min(0).max(1),
+      meaning: z.string().min(1),
+    })
+    .optional(),
 });
 
 const earningsEvidenceSchema = z.object({
-  annualizedRateBps: z.number().int().nonnegative().nullable(),
-  rateKind: z.enum(["supply-apr", "provider-apy"]),
+  annualizedRateBps: z.number().int().min(-10_000).nullable(),
+  rateKind: z.enum(["supply-apr", "provider-apy", "realized-apy"]),
   earnedToDateUsd: decimalStringSchema.nullable(),
-  observedAtBlock: z.number().int().nonnegative(),
+  observedAtBlock: z.number().int().nonnegative().nullable(),
   meaning: z.string(),
+  provenance: z.array(provenanceSchema).min(1),
+  confidence: confidenceSchema,
 });
 
 export const walletPositionSchema = z.object({
@@ -170,6 +182,19 @@ export interface PortfolioSummary {
   holdBtcComparisonUsd: string | null;
   holdBtcDeltaUsd: string | null;
   btcReferencePriceUsd: string | null;
+  /** Net value of only positions whose quantities and every monetary leg pass the verification policy. */
+  verifiedSubtotalUsd: string | null;
+  verifiedSubtotalPositionCount: number;
+  /** Net value of positions with accepted market quotes; quantity evidence may still be estimated. */
+  valuedSubtotalUsd: string | null;
+  valuedSubtotalPositionCount: number;
+  valuedAssetsSubtotalUsd: string | null;
+  valuedDebtSubtotalUsd: string | null;
+  valuedDeployedSubtotalUsd: string | null;
+  valuedIdleSubtotalUsd: string | null;
+  valuedLockedSubtotalUsd: string | null;
+  valuedBtcExposureSubtotalUsd: string | null;
+  valuedNetVsBtcExposureUsd: string | null;
   valuedPositionCount: number;
   missingValuationCount: number;
   metricMeanings: MetricMeaning[];
@@ -201,6 +226,8 @@ export interface PortfolioSummary {
     estimatedNetValueUsd: string | null;
     estimatedLossUsd: string | null;
     positionsAffected: number;
+    scope: "complete-portfolio" | "valued-subset";
+    excludedPositionCount: number;
     explanation: string;
   }>;
   data: {

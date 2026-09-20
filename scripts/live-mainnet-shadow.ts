@@ -4,7 +4,7 @@ import { registryManifestSchema } from "../packages/data-foundation/src/registry
 import { evaluateRisks } from "../packages/risk-engine/src/index.js";
 import { analyzePortfolio } from "../packages/portfolio-engine/src/index.js";
 import { planZestMainnetRepay } from "../packages/execution/src/index.js";
-import { BitflowMarketPriceBook, DiaOraclePriceBook, enrichPositionsWithUsd, ZestVaultExchangeRatePriceBook } from "../packages/pricing/src/index.js";
+import { BitflowMarketPriceBook, DiaOraclePriceBook, enrichPositionsWithUsd, StackingDaoExchangeRatePriceBook, ZestVaultExchangeRatePriceBook } from "../packages/pricing/src/index.js";
 
 const manifest = registryManifestSchema.parse(JSON.parse(await readFile(
   new URL("../registry/mainnet/2026-09-04.2.candidate.json", import.meta.url), "utf8",
@@ -14,8 +14,19 @@ const stacksUrl = process.env.STACKS_API_URL ?? "https://api.hiro.so";
 const zestAddress = process.env.ZEST_SHADOW_ADDRESS ?? "SP288D9CSDS3C10Z5C5J0R2ZE51HKZ35W4XWXKW7H";
 const bitflowAddress = process.env.BITFLOW_SHADOW_ADDRESS ?? "SP1BXRXA0Z67MB6G31FP1R52ZX5GQTZ5008KZG77A";
 const client = new StacksReadOnlyClient(stacksUrl, fetch, process.env.HIRO_API_KEY);
+const referenceClient = process.env.STACKS_REFERENCE_API_URL
+  ? new StacksReadOnlyClient(
+      process.env.STACKS_REFERENCE_API_URL,
+      fetch,
+      process.env.STACKS_REFERENCE_API_KEY,
+    )
+  : undefined;
 const priceBook = new ZestVaultExchangeRatePriceBook(
-  new BitflowMarketPriceBook(new DiaOraclePriceBook(client), provider), client, provider,
+  new StackingDaoExchangeRatePriceBook(
+    new BitflowMarketPriceBook(new DiaOraclePriceBook(client), provider), client, provider,
+  ),
+  client,
+  provider,
 );
 const verifiedAssets = async () => [
   ...manifest.entries.flatMap((entry) => entry.assetDefinitions),
@@ -25,9 +36,17 @@ const excludedWalletAssets = async () => manifest.entries
   .filter((entry) => entry.enabled && entry.protocol === "bitflow")
   .map((entry) => `${entry.contractPrincipal}::pool-token`);
 const adapters = [
-  { address: bitflowAddress, adapter: new StacksApiAdapter(stacksUrl, fetch, process.env.HIRO_API_KEY, verifiedAssets, excludedWalletAssets) },
+  { address: bitflowAddress, adapter: new StacksApiAdapter(stacksUrl, fetch, process.env.HIRO_API_KEY, verifiedAssets, excludedWalletAssets, referenceClient) },
   { address: zestAddress, adapter: new ZestMainnetAdapter(provider, client) },
-  { address: bitflowAddress, adapter: new BitflowMainnetAdapter(provider) },
+  { address: bitflowAddress, adapter: new BitflowMainnetAdapter(
+    provider,
+    process.env.BITFLOW_APP_API_URL ?? "https://bff.bitflowapis.finance/api/app",
+    process.env.BITFLOW_QUOTES_API_URL ?? "https://bff.bitflowapis.finance/api/quotes",
+    fetch,
+    stacksUrl,
+    process.env.HIRO_API_KEY,
+    referenceClient,
+  ) },
 ];
 
 const results = [];

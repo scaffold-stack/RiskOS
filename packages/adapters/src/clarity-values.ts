@@ -23,6 +23,12 @@ export function asUint(value: ClarityValue): bigint {
   return BigInt((value as UIntCV).value);
 }
 
+export function asBool(value: ClarityValue): boolean {
+  if (value.type === ClarityType.BoolTrue) return true;
+  if (value.type === ClarityType.BoolFalse) return false;
+  throw new Error("Expected a Clarity bool");
+}
+
 export function asTuple(value: ClarityValue): Record<string, ClarityValue> {
   if (value.type !== ClarityType.Tuple) throw new Error("Expected a Clarity tuple");
   return (value as TupleCV).value;
@@ -31,6 +37,12 @@ export function asTuple(value: ClarityValue): Record<string, ClarityValue> {
 export function asList(value: ClarityValue): ClarityValue[] {
   if (value.type !== ClarityType.List) throw new Error("Expected a Clarity list");
   return (value as ListCV).value;
+}
+
+export function asOptional(value: ClarityValue): ClarityValue | null {
+  if (value.type === ClarityType.OptionalNone) return null;
+  if (value.type !== ClarityType.OptionalSome) throw new Error("Expected a Clarity optional");
+  return value.value;
 }
 
 export function tupleField(tuple: Record<string, ClarityValue>, name: string): ClarityValue {
@@ -49,6 +61,13 @@ export function bufferToUint(value: ClarityValue): number {
 export function asPrincipal(value: ClarityValue): string {
   if (value.type !== ClarityType.PrincipalStandard && value.type !== ClarityType.PrincipalContract) {
     throw new Error("Expected a Clarity principal");
+  }
+  return value.value;
+}
+
+export function asText(value: ClarityValue): string {
+  if (value.type !== ClarityType.StringASCII && value.type !== ClarityType.StringUTF8) {
+    throw new Error("Expected a Clarity string");
   }
   return value.value;
 }

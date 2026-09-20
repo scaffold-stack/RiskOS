@@ -1,0 +1,31 @@
+{
+  "name": "@riskos/client",
+  "version": "0.2.0",
+  "description": "Typed, production-safe JavaScript and TypeScript SDK for the RiskOSfolio API",
+  "type": "module",
+  "sideEffects": false,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

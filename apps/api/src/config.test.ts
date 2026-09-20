@@ -3,7 +3,18 @@ import { loadRuntimeConfig } from "./config.js";
 
 describe("production configuration", () => {
   it("defaults to the official Emily API and a configurable Esplora-compatible Bitcoin source", () => {
-    expect(loadRuntimeConfig({})).toMatchObject({ SBTC_EMILY_URL: "https://sbtc-emily.com", BITCOIN_ESPLORA_URL: "https://mempool.space/api" });
+    expect(loadRuntimeConfig({})).toMatchObject({
+      SBTC_EMILY_URL: "https://sbtc-emily.com",
+      BITCOIN_ESPLORA_URL: "https://mempool.space/api",
+      PUBLIC_RATE_LIMIT_PER_MINUTE: 60,
+    });
+  });
+
+  it("validates the anonymous public API rate limit", () => {
+    expect(loadRuntimeConfig({ PUBLIC_RATE_LIMIT_PER_MINUTE: "120" })).toMatchObject({
+      PUBLIC_RATE_LIMIT_PER_MINUTE: 120,
+    });
+    expect(() => loadRuntimeConfig({ PUBLIC_RATE_LIMIT_PER_MINUTE: "0" })).toThrow();
   });
 
   it("refuses to expose fixtures in production", () => {

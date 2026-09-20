@@ -17,8 +17,8 @@ paths:
           schema: { type: string }
         - in: query
           name: limit
-          description: Maximum canonical observations (blocks), never raw position rows.
-          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+          description: Maximum canonical observations (blocks), never raw position rows. Free access includes 30 observations; deeper history requires an eligible wallet plan or API key.
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 30 }
       responses:
         "200":
           description: Canonical observations and earned-yield reconciliation readiness
@@ -51,6 +51,8 @@ paths:
                   earnedYield: { type: object }
         "503":
           description: Canonical history storage is not configured
+        "403":
+          description: Extended history requires an eligible plan
   /v1/yield/markets:
     get:
       operationId: getYieldMarkets
@@ -90,6 +92,7 @@ paths:
         "200":
           description: Automatic allocation, projections, source labels, policy constraints, and excluded markets
         "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
         "502": { $ref: "#/components/responses/Problem" }
   /health:
     get:
@@ -107,6 +110,40 @@ paths:
                   dataMode: { enum: [fixture, live] }
                   execution: { type: string }
                   time: { type: string, format: date-time }
+  /v1/plans:
+    get:
+      operationId: getPlans
+      summary: Read public product plans and enforceable limits
+      responses:
+        "200":
+          description: Free, Pro, Treasury, Developer, and Protocol plan catalog
+  /v1/developer/usage:
+    get:
+      operationId: getDeveloperUsage
+      security: [{ apiKey: [] }]
+      summary: Read the authenticated API key and current UTC-month usage
+      responses:
+        "200": { description: Current key metadata, allowance, and remaining requests }
+        "401": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /v1/account/plan:
+    get:
+      operationId: getAccountPlan
+      security: [{ sessionCookie: [] }]
+      summary: Read the wallet-owned plan and entitlement
+      responses:
+        "200": { description: Effective wallet plan and optional entitlement }
+        "401": { $ref: "#/components/responses/Problem" }
+  /v1/reports/portfolio:
+    get:
+      operationId: getPortfolioEvidenceReport
+      security: [{ sessionCookie: [] }]
+      summary: Generate an owner-authenticated current evidence report
+      description: Returns the current portfolio, normalized positions, risk findings, provenance, confidence, and an explicit integrity boundary. It is not an audit or transaction authorization.
+      responses:
+        "200": { description: Current riskos.report.v1 evidence artifact }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
   /v1/address/{address}/overview:
     get:
       summary: Inspect positions, risks, and portfolio in one discovery pass
@@ -222,6 +259,8 @@ paths:
         "201": { description: Rule saved and evaluated immediately }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+        "403":
+          description: Current plan alert-rule limit reached
   /v1/address/{address}/risk:
     get:
       operationId: getAddressRisk
@@ -467,6 +506,10 @@ components:
       type: apiKey
       in: cookie
       name: riskos_session
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
   parameters:
     Address:
       name: address

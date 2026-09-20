@@ -69,6 +69,16 @@ import {
   MAX_YIELD_EVIDENCE_AGE_SECONDS,
   MAX_YIELD_SIMULATION_USD,
 } from "../../../packages/strategy-engine/src/index.js";
+import {
+  COMMERCIAL_PLANS,
+  CommercialService,
+  MemoryCommercialStore,
+  hasCommercialFeature,
+  type ApiUsage,
+  type CommercialFeature,
+  type CommercialStore,
+  type PublicApiKey,
+} from "../../../packages/commercial/src/index.js";
 
 export interface AppOptions {
   dataMode?: "fixture" | "live";
@@ -104,6 +114,8 @@ export interface AppOptions {
   registryMode?: "signed" | "candidate" | "none";
   adapters?: ProtocolAdapter[];
   yieldMarketProvider?: YieldMarketProvider;
+  commercialStore?: CommercialStore;
+  publicRateLimitPerMinute?: number;
 }
 
 const actionPlanSchema = z.object({
@@ -139,10 +151,35 @@ const yieldAllocationSchema = z.object({
   days: z.union([z.literal(30), z.literal(90), z.literal(365)]),
   mode: z.enum(["explore", "recommend"]).default("explore"),
 });
+const apiKeyCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  plan: z.enum(["developer", "protocol"]),
+  monthlyRequestLimit: z.number().int().min(1).max(10_000_000).optional(),
+});
+const entitlementSchema = z.object({
+  address: stacksAddressSchema,
+  plan: z.enum(["free", "pro", "treasury", "protocol"]),
+  endsAt: z.string().datetime().nullable().optional(),
+  source: z.enum(["manual", "billing"]).default("manual"),
+});
 
 function usdCents(value: string): bigint {
   const [whole, fraction = ""] = value.split(".");
   return BigInt(whole!) * 100n + BigInt(fraction.padEnd(2, "0"));
+}
+
+function nextUtcMonth(at: Date): Date {
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1));
+}
+
+function isPublicRateLimitedPath(url: string): boolean {
+  const path = url.split("?", 1)[0] ?? url;
+  return (
+    path.startsWith("/v1/address/") ||
+    path.startsWith("/v1/yield/") ||
+    path === "/v1/actions/plan" ||
+    path === "/v1/auth/challenge"
+  );
 }
 
 function problem(status: number, code: string, title: string, detail: string) {
@@ -161,6 +198,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   const dataMode = options.dataMode ?? "fixture";
   const network = options.network ?? "mainnet";
   const productStore = options.productStore ?? new MemoryProductStore();
+  const commercial = new CommercialService(options.commercialStore ?? new MemoryCommercialStore(), now);
+  const commercialPrincipals = new WeakMap<object, { key: PublicApiKey; usage: ApiUsage }>();
+  const publicRateLimitPerMinute = options.publicRateLimitPerMinute ?? 60;
+  if (!Number.isSafeInteger(publicRateLimitPerMinute) || publicRateLimitPerMinute < 1)
+    throw new Error("publicRateLimitPerMinute must be a positive integer");
+  const anonymousRateWindows = new Map<string, { startedAt: number; count: number }>();
   const auth = new WalletAuthService(
     productStore,
     network,
@@ -567,16 +610,103 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(cors, {
     origin: process.env.WEB_ORIGIN?.split(",") ?? ["http://localhost:5173"],
     methods: ["GET", "POST"],
+    allowedHeaders: ["content-type", "authorization", "x-api-key", "x-riskos-sdk-version"],
     credentials: true,
   });
 
   app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("x-request-id", _request.id);
     reply.header("x-content-type-options", "nosniff");
     reply.header("x-frame-options", "DENY");
     reply.header("referrer-policy", "no-referrer");
     reply.header("cache-control", "no-store");
     return payload;
   });
+
+  app.addHook("onRequest", async (request, reply) => {
+    const supplied = request.headers["x-api-key"];
+    if (supplied === undefined) {
+      if (request.method === "OPTIONS" || !isPublicRateLimitedPath(request.url)) return;
+      const at = now().getTime();
+      const windowMs = 60_000;
+      const existing = anonymousRateWindows.get(request.ip);
+      const current =
+        !existing || at - existing.startedAt >= windowMs
+          ? { startedAt: at, count: 0 }
+          : existing;
+      const resetAt = current.startedAt + windowMs;
+      reply.header("x-ratelimit-limit", publicRateLimitPerMinute);
+      reply.header("x-ratelimit-remaining", Math.max(0, publicRateLimitPerMinute - current.count - 1));
+      reply.header("x-ratelimit-reset", new Date(resetAt).toISOString());
+      reply.header("x-ratelimit-scope", "anonymous-ip");
+      if (current.count >= publicRateLimitPerMinute) {
+        reply.header("retry-after", Math.max(1, Math.ceil((resetAt - at) / 1_000)));
+        return reply
+          .code(429)
+          .send(
+            problem(
+              429,
+              "PUBLIC_RATE_LIMIT_EXCEEDED",
+              "Public request limit exceeded",
+              "Retry after the current minute or use a metered API plan for commercial capacity.",
+            ),
+          );
+      }
+      anonymousRateWindows.set(request.ip, { ...current, count: current.count + 1 });
+      if (anonymousRateWindows.size > 10_000) {
+        for (const [ip, value] of anonymousRateWindows) {
+          if (at - value.startedAt >= windowMs) anonymousRateWindows.delete(ip);
+        }
+        if (anonymousRateWindows.size > 10_000) {
+          const oldest = anonymousRateWindows.keys().next().value;
+          if (typeof oldest === "string") anonymousRateWindows.delete(oldest);
+        }
+      }
+      return;
+    }
+    if (typeof supplied !== "string" || supplied.includes(",")) {
+      return reply
+        .code(401)
+        .send(problem(401, "API_KEY_INVALID", "Invalid API key", "Supply exactly one API key."));
+    }
+    const authentication = await commercial.authenticateAndConsume(supplied);
+    if (authentication.state === "invalid") {
+      return reply
+        .code(401)
+        .send(problem(401, "API_KEY_INVALID", "Invalid API key", "The API key is unknown or revoked."));
+    }
+    reply.header("x-ratelimit-limit", authentication.usage.monthlyRequestLimit);
+    reply.header("x-ratelimit-remaining", authentication.usage.remaining);
+    reply.header("x-ratelimit-period", authentication.usage.periodStart);
+    const quotaResetAt = nextUtcMonth(now());
+    reply.header("x-ratelimit-reset", quotaResetAt.toISOString());
+    if (authentication.state === "exhausted") {
+      reply.header("retry-after", Math.max(1, Math.ceil((quotaResetAt.getTime() - now().getTime()) / 1_000)));
+      return reply
+        .code(429)
+        .send(
+          problem(
+            429,
+            "API_QUOTA_EXCEEDED",
+            "API quota exceeded",
+            "The API key has exhausted its monthly request allowance.",
+          ),
+        );
+    }
+    commercialPrincipals.set(request, { key: authentication.key, usage: authentication.usage });
+  });
+
+  async function requestHasFeature(
+    request: { headers: Record<string, string | string[] | undefined> },
+    feature: CommercialFeature,
+  ): Promise<boolean> {
+    const principal = commercialPrincipals.get(request);
+    if (principal && hasCommercialFeature(COMMERCIAL_PLANS[principal.key.plan], feature)) return true;
+    const session = await auth.authenticate(sessionTokenFromHeaders(request.headers), now());
+    if (!session) return false;
+    const { plan } = await commercial.walletPlan(session.address);
+    return hasCommercialFeature(plan, feature);
+  }
 
   app.get("/v1/yield/markets", async (_request, reply) => {
     try {
@@ -607,6 +737,17 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
             "INVALID_YIELD_INPUT",
             "Invalid simulation input",
             parsed.error.issues[0]?.message ?? "Invalid input",
+          ),
+        );
+    if (parsed.data.mode === "recommend" && !(await requestHasFeature(request, "yield-recommend")))
+      return reply
+        .code(403)
+        .send(
+          problem(
+            403,
+            "UPGRADE_REQUIRED",
+            "Recommendation mode requires an upgraded plan",
+            "Explore mode remains free. Pro, Treasury, Developer, and Protocol plans include evidence-gated recommendations.",
           ),
         );
     try {
@@ -762,6 +903,118 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   app.get("/v1/demo", async () => ({ address: DEMO_ADDRESS }));
 
+  app.get("/v1/plans", async () => ({
+    currency: "USD",
+    billingState: "manual-provisioning",
+    plans: commercial.plans(),
+    executionFeesEnabled: false,
+  }));
+
+  app.get("/v1/developer/usage", async (request, reply) => {
+    const principal = commercialPrincipals.get(request);
+    if (!principal)
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "API_KEY_REQUIRED",
+            "API key required",
+            "Authenticate with a developer or protocol API key to inspect usage.",
+          ),
+        );
+    return { key: principal.key, usage: principal.usage };
+  });
+
+  app.post("/v1/operations/api-keys", async (request, reply) => {
+    if (!bearerMatches(request.headers.authorization, options.operationsBearerToken))
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "OPERATIONS_UNAUTHORIZED",
+            "Unauthorized",
+            "A valid operations bearer token is required.",
+          ),
+        );
+    const parsed = apiKeyCreateSchema.safeParse(request.body);
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send(
+          problem(
+            400,
+            "INVALID_API_KEY_REQUEST",
+            "Invalid API key request",
+            parsed.error.issues.map((issue) => issue.message).join(", "),
+          ),
+        );
+    return reply.code(201).send(
+      await commercial.createApiKey({
+        name: parsed.data.name,
+        plan: parsed.data.plan,
+        ...(parsed.data.monthlyRequestLimit === undefined
+          ? {}
+          : { monthlyRequestLimit: parsed.data.monthlyRequestLimit }),
+      }),
+    );
+  });
+
+  app.post<{ Params: { keyId: string } }>("/v1/operations/api-keys/:keyId/revoke", async (request, reply) => {
+    if (!bearerMatches(request.headers.authorization, options.operationsBearerToken))
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "OPERATIONS_UNAUTHORIZED",
+            "Unauthorized",
+            "A valid operations bearer token is required.",
+          ),
+        );
+    const revoked = await commercial.revokeApiKey(request.params.keyId);
+    if (!revoked)
+      return reply
+        .code(404)
+        .send(problem(404, "API_KEY_NOT_FOUND", "API key not found", "The key is unknown or already revoked."));
+    return { keyId: request.params.keyId, status: "revoked" };
+  });
+
+  app.post("/v1/operations/entitlements", async (request, reply) => {
+    if (!bearerMatches(request.headers.authorization, options.operationsBearerToken))
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "OPERATIONS_UNAUTHORIZED",
+            "Unauthorized",
+            "A valid operations bearer token is required.",
+          ),
+        );
+    const parsed = entitlementSchema.safeParse(request.body);
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send(
+          problem(
+            400,
+            "INVALID_ENTITLEMENT",
+            "Invalid entitlement",
+            parsed.error.issues.map((issue) => issue.message).join(", "),
+          ),
+        );
+    return reply.code(201).send(
+      await commercial.grantWalletPlan({
+        address: parsed.data.address,
+        plan: parsed.data.plan,
+        source: parsed.data.source,
+        ...(parsed.data.endsAt === undefined ? {} : { endsAt: parsed.data.endsAt }),
+      }),
+    );
+  });
+
   app.post("/v1/auth/challenge", async (request, reply) => {
     const parsed = walletChallengeSchema.safeParse(request.body);
     if (!parsed.success)
@@ -835,6 +1088,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     const session = await sessionFor(request, reply);
     if (!session) return;
     return { address: session.address, expiresAt: session.expiresAt };
+  });
+
+  app.get("/v1/account/plan", async (request, reply) => {
+    const session = await sessionFor(request, reply);
+    if (!session) return;
+    return commercial.walletPlan(session.address);
   });
 
   app.post("/v1/auth/logout", async (request, reply) => {
@@ -1049,10 +1308,21 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
             ),
           );
       }
-      const requestedLimit = Number(request.query.limit ?? 100);
+      const requestedLimit = Number(request.query.limit ?? 30);
       const observationLimit = Number.isSafeInteger(requestedLimit)
         ? Math.min(1_000, Math.max(1, requestedLimit))
-        : 100;
+        : 30;
+      if (observationLimit > 30 && !(await requestHasFeature(request, "history-extended")))
+        return reply
+          .code(403)
+          .send(
+            problem(
+              403,
+              "UPGRADE_REQUIRED",
+              "Extended history requires an upgraded plan",
+              "Free access includes the latest 30 canonical observations. Upgrade for deeper history.",
+            ),
+          );
       const cashFlowKinds = ["vault-deposit", "vault-redeem", "pool-mint", "pool-burn"] as const;
       const [snapshots, cashFlowEvents] = await Promise.all([
         options.dataFoundation.positionSnapshotHistory(network, parsed.data, observationLimit),
@@ -1383,6 +1653,41 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     };
   });
 
+  app.get("/v1/reports/portfolio", async (request, reply) => {
+    const session = await sessionFor(request, reply);
+    if (!session) return;
+    const { plan } = await commercial.walletPlan(session.address);
+    if (!hasCommercialFeature(plan, "reports"))
+      return reply
+        .code(403)
+        .send(
+          problem(
+            403,
+            "UPGRADE_REQUIRED",
+            "Portfolio evidence reports require an upgraded plan",
+            "Pro, Treasury, and Protocol wallet plans include owner-authenticated evidence reports.",
+          ),
+        );
+    const positions = await positionsFor(session.address);
+    const { risks, portfolio } = await portfolioFor(session.address, positions);
+    return {
+      schemaVersion: "riskos.report.v1",
+      generatedAt: now().toISOString(),
+      address: session.address,
+      plan: plan.id,
+      portfolio,
+      positions,
+      risks,
+      integrity: {
+        walletOwnershipAuthenticated: true,
+        currentEvidenceOnly: true,
+        advisoryOnly: dataMode === "live",
+        meaning:
+          "This report preserves the current evidence returned by RiskOSfolio. It is not an audit, custody statement, or transaction authorization.",
+      },
+    };
+  });
+
   app.post("/v1/alerts/rules", async (request, reply) => {
     const session = await sessionFor(request, reply);
     if (!session) return;
@@ -1396,6 +1701,19 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
             "INVALID_ALERT_RULE",
             "Invalid alert rule",
             parsed.error.issues.map((issue) => issue.message).join(", "),
+          ),
+        );
+    const { plan } = await commercial.walletPlan(session.address);
+    const existingRules = await productStore.alertRules(session.address);
+    if (existingRules.length >= plan.maxAlertRules)
+      return reply
+        .code(403)
+        .send(
+          problem(
+            403,
+            "ALERT_LIMIT_REACHED",
+            "Alert rule limit reached",
+            `${plan.name} includes ${plan.maxAlertRules} alert rule${plan.maxAlertRules === 1 ? "" : "s"}. Upgrade to monitor more policies.`,
           ),
         );
     const rule = createAlertRule({ address: session.address, ...parsed.data }, now());

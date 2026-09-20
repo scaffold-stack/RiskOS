@@ -179,7 +179,7 @@ describe("RiskOS API integration", () => {
       evidenceState: "verified",
       confidenceScore: 0.92,
       observedAtBlock: 123_456,
-      observedAt: "2026-09-13T11:54:59.000Z",
+      observedAt: "2026-09-13T10:59:59.000Z",
       tvlUsd: null,
       independentRateEvidence: null,
       capacityEvidence: null,
@@ -203,7 +203,7 @@ describe("RiskOS API integration", () => {
       unallocatedUsd: "1000.00",
       markets: [expect.objectContaining({
         eligibleForAllocation: false,
-        allocationExclusionReason: "Rate evidence is stale (301s old; maximum 300s).",
+        allocationExclusionReason: "Rate evidence is stale (3601s old; maximum 3600s).",
       })],
     });
   });
@@ -349,6 +349,153 @@ describe("RiskOS API integration", () => {
     expect(alerts.json()).toMatchObject({ address: DEMO_ADDRESS });
     expect(alerts.json().rules).toHaveLength(1);
     expect(alerts.json().occurrences).toHaveLength(2);
+    const limited = await app.inject({
+      method: "POST",
+      url: "/v1/alerts/rules",
+      headers: { cookie },
+      payload: {
+        name: "Second free rule",
+        categories: ["oracle"],
+        minimumSeverity: "high",
+      },
+    });
+    expect(limited.statusCode).toBe(403);
+    expect(limited.json()).toMatchObject({ code: "ALERT_LIMIT_REACHED" });
+  });
+
+  it("publishes honest plans and enforces API key quotas and paid recommendation mode", async () => {
+    const operationsBearerToken = "operations-token-that-is-at-least-32-characters";
+    app = await buildApp({
+      dataMode: "fixture",
+      operationsBearerToken,
+      now: () => new Date("2026-09-20T12:00:00Z"),
+    });
+
+    const plans = await app.inject({ method: "GET", url: "/v1/plans" });
+    expect(plans.statusCode).toBe(200);
+    expect(plans.json()).toMatchObject({
+      billingState: "manual-provisioning",
+      executionFeesEnabled: false,
+      plans: expect.arrayContaining([
+        expect.objectContaining({ id: "free", priceUsdMonthly: 0 }),
+        expect.objectContaining({ id: "developer", priceUsdMonthly: 399 }),
+      ]),
+    });
+
+    const paidModeDenied = await app.inject({
+      method: "POST",
+      url: "/v1/yield/allocations",
+      payload: { capitalUsd: "1000", days: 30, mode: "recommend" },
+    });
+    expect(paidModeDenied.statusCode).toBe(403);
+    expect(paidModeDenied.json()).toMatchObject({ code: "UPGRADE_REQUIRED" });
+
+    const provisioned = await app.inject({
+      method: "POST",
+      url: "/v1/operations/api-keys",
+      headers: { authorization: `Bearer ${operationsBearerToken}` },
+      payload: { name: "SDK customer", plan: "developer", monthlyRequestLimit: 2 },
+    });
+    expect(provisioned.statusCode).toBe(201);
+    const apiKey = String(provisioned.json().apiKey);
+    expect(apiKey).toMatch(/^rko_/);
+    expect(provisioned.json().key).not.toHaveProperty("secretHash");
+
+    const usage = await app.inject({
+      method: "GET",
+      url: "/v1/developer/usage",
+      headers: { "x-api-key": apiKey },
+    });
+    expect(usage.statusCode).toBe(200);
+    expect(usage.json().usage).toMatchObject({ requestCount: 1, remaining: 1 });
+    expect(usage.headers["x-ratelimit-remaining"]).toBe("1");
+
+    const paidMode = await app.inject({
+      method: "POST",
+      url: "/v1/yield/allocations",
+      headers: { "x-api-key": apiKey },
+      payload: { capitalUsd: "1000", days: 30, mode: "recommend" },
+    });
+    expect(paidMode.statusCode).toBe(200);
+    expect(paidMode.json()).toMatchObject({ mode: "recommend" });
+
+    const exhausted = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { "x-api-key": apiKey },
+    });
+    expect(exhausted.statusCode).toBe(429);
+    expect(exhausted.json()).toMatchObject({ code: "API_QUOTA_EXCEEDED" });
+    expect(Number(exhausted.headers["retry-after"])).toBeGreaterThan(0);
+    expect(exhausted.headers["x-ratelimit-reset"]).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("bounds anonymous expensive reads without rate-limiting health checks", async () => {
+    app = await buildApp({
+      dataMode: "fixture",
+      publicRateLimitPerMinute: 2,
+      now: () => new Date("2026-09-20T12:00:00Z"),
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const allowed = await app.inject({ method: "GET", url: "/v1/address/not-an-address/positions" });
+      expect(allowed.statusCode).toBe(400);
+      expect(allowed.headers["x-ratelimit-scope"]).toBe("anonymous-ip");
+    }
+    const limited = await app.inject({ method: "GET", url: "/v1/address/not-an-address/positions" });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({ code: "PUBLIC_RATE_LIMIT_EXCEEDED" });
+    expect(limited.headers["retry-after"]).toBe("60");
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    expect(health.statusCode).toBe(200);
+  });
+
+  it("generates owner-authenticated evidence reports only for entitled wallets", async () => {
+    const operationsBearerToken = "operations-token-that-is-at-least-32-characters";
+    app = await buildApp({
+      dataMode: "fixture",
+      network: "testnet",
+      operationsBearerToken,
+      now: () => new Date("2026-09-20T12:00:00Z"),
+    });
+    const cookie = await authenticate(app);
+    const freeReport = await app.inject({
+      method: "GET",
+      url: "/v1/reports/portfolio",
+      headers: { cookie },
+    });
+    expect(freeReport.statusCode).toBe(403);
+    expect(freeReport.json()).toMatchObject({ code: "UPGRADE_REQUIRED" });
+
+    const granted = await app.inject({
+      method: "POST",
+      url: "/v1/operations/entitlements",
+      headers: { authorization: `Bearer ${operationsBearerToken}` },
+      payload: {
+        address: DEMO_ADDRESS,
+        plan: "pro",
+        endsAt: "2026-10-20T12:00:00.000Z",
+      },
+    });
+    expect(granted.statusCode).toBe(201);
+
+    const report = await app.inject({
+      method: "GET",
+      url: "/v1/reports/portfolio",
+      headers: { cookie },
+    });
+    expect(report.statusCode).toBe(200);
+    expect(report.json()).toMatchObject({
+      schemaVersion: "riskos.report.v1",
+      address: DEMO_ADDRESS,
+      plan: "pro",
+      portfolio: { address: DEMO_ADDRESS },
+      positions: { address: DEMO_ADDRESS },
+      integrity: {
+        walletOwnershipAuthenticated: true,
+        currentEvidenceOnly: true,
+      },
+    });
   });
 
   it("uses an RFC 9457-style problem response for invalid addresses", async () => {

@@ -28,6 +28,7 @@ const runtimeConfigSchema = z.object({
   COINGECKO_DEMO_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   COINBASE_EXCHANGE_API_URL: z.string().url().default("https://api.exchange.coinbase.com"),
   PRICE_MAX_DIVERGENCE_BPS: z.coerce.number().int().min(1).max(2_000).default(150),
+  PUBLIC_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(60),
   REGISTRY_TRUSTED_KEY_FINGERPRINTS: z.preprocess(emptyToUndefined, z.string().optional()),
   REGISTRY_CANDIDATE_PATH: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   REGISTRY_SIGNED_PATH: z.preprocess(emptyToUndefined, z.string().min(1).optional()),

@@ -15,6 +15,7 @@ import {
   type RegistryStore,
 } from "../../../packages/data-foundation/src/index.js";
 import { PostgresProductStore } from "../../../packages/workflows/src/index.js";
+import { PostgresCommercialStore } from "../../../packages/commercial/src/index.js";
 
 const config = loadRuntimeConfig(process.env);
 const sql = config.DATABASE_URL ? postgres(config.DATABASE_URL, { max: 10, idle_timeout: 20 }) : undefined;
@@ -76,11 +77,13 @@ const app = await buildApp({
     pythHermesUrl: config.PYTH_HERMES_URL,
   } : {}),
   priceMaximumDivergenceBps: config.PRICE_MAX_DIVERGENCE_BPS,
+  publicRateLimitPerMinute: config.PUBLIC_RATE_LIMIT_PER_MINUTE,
   coinGeckoApiUrl: config.COINGECKO_API_URL,
   coinbaseExchangeApiUrl: config.COINBASE_EXCHANGE_API_URL,
   ...(config.COINGECKO_DEMO_API_KEY ? { coinGeckoDemoApiKey: config.COINGECKO_DEMO_API_KEY } : {}),
   ...(registryStore ? { registryStore } : {}),
   ...(sql ? { productStore: new PostgresProductStore(sql) } : {}),
+  ...(sql ? { commercialStore: new PostgresCommercialStore(sql) } : {}),
   authAudience: config.WEB_ORIGIN?.split(",")[0] ?? "http://localhost:5173",
   registryVerifier: new ContractRegistryVerifier(config.STACKS_API_URL, fetch, config.HIRO_API_KEY),
   ...(trustedFingerprints ? { trustedRegistryKeyFingerprints: trustedFingerprints } : {}),

@@ -7,5 +7,5 @@
     <path d="M38 50L70 78" stroke="#35D69B" stroke-width="9" stroke-linecap="round"/>
   </g>
   <text x="96" y="60" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="-2">RiskOS</text>
-  <text x="264" y="34" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="15" font-weight="600">folio</text>
+  <text x="280" y="34" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="15" font-weight="600">folio</text>
 </svg>

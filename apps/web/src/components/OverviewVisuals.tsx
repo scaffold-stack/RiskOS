@@ -5,6 +5,7 @@ import { formatUsd, humanAmount } from "../lib/portfolio.js";
 import { Icon, type IconName } from "./Icons.js";
 import { AssetIcon } from "./AssetIcon.js";
 import { ProtocolIcon } from "./ProtocolIcon.js";
+import type { PortfolioHistoryResponse } from "../api.js";
 
 const overviewPalette = ["#00875f", "#31c996", "#9ce7cf", "#5aaee6", "#f0b14f"];
 
@@ -54,7 +55,7 @@ export function MetricTile({
         <span className="ov-metric-label">{label}</span>
         <div className="ov-metric-value">
           <strong>{value}</strong>
-          <small>USD</small>
+          {value !== "Unavailable" && value !== "Unsupported" ? <small>USD</small> : null}
         </div>
         <p>{detail}</p>
         {progress != null ? (
@@ -67,20 +68,38 @@ export function MetricTile({
   );
 }
 
-export function PortfolioPerformance({ summary }: { summary: PortfolioSummary }) {
+export function PortfolioPerformance({
+  summary,
+  history,
+}: {
+  summary: PortfolioSummary;
+  history: PortfolioHistoryResponse | null;
+}) {
+  const observationCount = history?.observations.length ?? 0;
+  const complete = summary.netWorthUsd !== null;
+  const displayedNet = summary.netWorthUsd ?? summary.valuedSubtotalUsd;
+  const displayedBtc = summary.holdBtcComparisonUsd ?? summary.valuedBtcExposureSubtotalUsd;
+  const valuedHistory = (history?.observations ?? [])
+    .filter((item) => item.valuedNetSubtotalUsd !== null)
+    .slice(-30);
+  const historyReady = valuedHistory.length >= 2;
+  const historyServiceAvailable = history !== null;
   return (
-    <DashboardPanel title="Portfolio performance (30 days)" className="ov-performance">
+    <DashboardPanel
+      title={historyReady ? "Portfolio value history (canonical)" : "Portfolio history"}
+      className="ov-performance"
+    >
       <div className="ov-chart-top">
         <div className="ov-chart-legends">
           <ChartLegend
             color="#08a875"
-            label="Net worth (your portfolio)"
-            value={formatUsd(summary.netWorthUsd)}
+            label={complete ? "Net worth (your portfolio)" : "Valued net subtotal (partial)"}
+            value={formatUsd(displayedNet)}
           />
           <ChartLegend
             color="#82b7ac"
             label="Gross BTC-linked exposure"
-            value={formatUsd(summary.holdBtcComparisonUsd)}
+            value={formatUsd(displayedBtc)}
           />
         </div>
         <div className="ov-periods" aria-label="Performance period">
@@ -91,51 +110,106 @@ export function PortfolioPerformance({ summary }: { summary: PortfolioSummary })
           ))}
         </div>
       </div>
-      <div
-        className="ov-chart"
-        role="img"
-        aria-label="Portfolio history is not yet available; latest canonical values are shown"
-      >
-        <span className="ov-y-title">USD</span>
-        <svg viewBox="0 0 900 205" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="latestValueFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#22bd89" stopOpacity=".2" />
-              <stop offset="1" stopColor="#22bd89" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {[22, 72, 122, 172].map((y) => (
-            <line key={`h-${y}`} x1="58" x2="890" y1={y} y2={y} className="ov-gridline" />
-          ))}
-          {[58, 150, 242, 334, 426, 518, 610, 702, 794, 890].map((x) => (
-            <line key={`v-${x}`} x1={x} x2={x} y1="22" y2="172" className="ov-gridline" />
-          ))}
-          <line x1="825" x2="825" y1="12" y2="172" className="ov-current-line" />
-          <path d="M58 172 L825 172 L825 82 L890 70 L890 172 Z" fill="url(#latestValueFill)" />
-          <path d="M825 82 L890 70" className="ov-latest-segment" />
-          <circle cx="825" cy="82" r="5" fill="#09a875" stroke="#fff" strokeWidth="2" />
-          <circle cx="890" cy="70" r="4" fill="#09a875" />
-        </svg>
-        <div className="ov-y-labels">
-          <span>$800K</span>
-          <span>$600K</span>
-          <span>$400K</span>
-          <span>$200K</span>
-          <span>$0</span>
+      {historyReady ? (
+        <CanonicalValueChart observations={valuedHistory} />
+      ) : (
+        <div className="ov-chart ov-chart-unavailable" role="status">
+          <Icon name="chart" size={28} />
+          <strong>
+            {historyServiceAvailable
+              ? "Historical value needs another canonical observation"
+              : "Canonical history service is not active"}
+          </strong>
+          <p>
+            {!historyServiceAvailable
+              ? "Start PostgreSQL, ingest canonical Chainhook blocks, and run the portfolio observer. RiskOS will not turn the current value into synthetic history."
+              : observationCount === 1
+              ? "One reorg-safe baseline is stored. The next canonical snapshot will make value change visible; earned yield remains separate until cash flows are attributed."
+              : "RiskOS needs at least two canonical, reorg-safe observations before evaluating change. A single current value is never stretched into synthetic history."}
+          </p>
+          <div className="ov-chart-note">
+            <strong>Current observation only</strong>
+            <span>{complete ? "Net worth" : "Valued subtotal"}&nbsp; {formatUsd(displayedNet)}</span>
+            <span>BTC-linked&nbsp; {formatUsd(displayedBtc)}</span>
+          </div>
         </div>
-        <div className="ov-x-labels">
-          <span>30 days ago</span>
-          <span>History begins with canonical snapshots</span>
-          <span>Latest</span>
-        </div>
-        <div className="ov-chart-note">
-          <strong>Latest observation</strong>
-          <span>Portfolio&nbsp; {formatUsd(summary.netWorthUsd)}</span>
-          <span>BTC-linked&nbsp; {formatUsd(summary.holdBtcComparisonUsd)}</span>
-        </div>
-      </div>
+      )}
     </DashboardPanel>
   );
+}
+
+export function CanonicalValueChart({
+  observations,
+  compact = false,
+}: {
+  observations: NonNullable<PortfolioHistoryResponse>["observations"];
+  compact?: boolean;
+}) {
+  const values = observations.map((item) => Number(item.valuedNetSubtotalUsd));
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const span = Math.max(maximum - minimum, maximum * 0.01, 1);
+  const points = values
+    .map((value, index) => {
+      const x = observations.length === 1 ? 50 : (index / (observations.length - 1)) * 100;
+      const y = 88 - ((value - minimum) / span) * 68;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const areaPoints = `0,100 ${points} 100,100`;
+  const first = observations[0]!;
+  const last = observations.at(-1)!;
+  const delta = values.at(-1)! - values[0]!;
+  const excluded = Math.max(...observations.map((item) => item.excludedPositionCount));
+  return (
+    <div
+      className={`ov-chart ov-canonical-chart${compact ? " ov-canonical-chart-compact" : ""}`}
+      role="img"
+      aria-label="Canonical valued subtotal history"
+    >
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {[20, 42, 64, 86].map((y) => (
+          <line key={y} x1="0" x2="100" y1={y} y2={y} className="ov-gridline" />
+        ))}
+        <polygon points={areaPoints} className="ov-latest-fill" />
+        <polyline points={points} className="ov-latest-segment" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="ov-history-axis">
+        <span>Block {first.blockHeight.toLocaleString()}</span>
+        <span>Block {last.blockHeight.toLocaleString()}</span>
+      </div>
+      {!compact ? (
+        <>
+          <div className="ov-chart-note">
+            <strong>Canonical value change</strong>
+            <span>Latest {formatUsd(last.valuedNetSubtotalUsd)}</span>
+            <span className={delta < 0 ? "negative" : ""}>
+              Change {delta < 0 ? "−" : "+"}
+              {formatUsd(String(Math.abs(delta)))}
+            </span>
+            <small>
+              {observations.length} observations · {excluded} excluded
+            </small>
+          </div>
+          <p className="ov-history-disclaimer">
+            Value change is not earned yield until deposits, withdrawals, fees, debt flows and price
+            movement are attributed.
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Shared stats for compact Positions history card — keeps layout in the host card. */
+export function canonicalHistoryDelta(
+  observations: NonNullable<PortfolioHistoryResponse>["observations"],
+): { delta: number; excluded: number } {
+  const values = observations.map((item) => Number(item.valuedNetSubtotalUsd));
+  return {
+    delta: values.at(-1)! - values[0]!,
+    excluded: Math.max(...observations.map((item) => item.excludedPositionCount)),
+  };
 }
 
 function ChartLegend({ color, label, value }: { color: string; label: string; value: string }) {
@@ -154,11 +228,13 @@ export function RiskPosture({
   summary,
   actionableCount,
   liquidityActive,
+  liquidityEvidenceAvailable,
   onReview,
 }: {
   summary: PortfolioSummary;
   actionableCount: number;
   liquidityActive: boolean;
+  liquidityEvidenceAvailable: boolean;
   onReview: () => void;
 }) {
   const score = clamp(summary.risk.score);
@@ -198,11 +274,19 @@ export function RiskPosture({
           />
           <RiskFact
             icon="droplet"
-            title={liquidityActive ? "Liquidity position is active" : "No active liquidity position"}
+            title={
+              liquidityActive
+                ? "Liquidity position is active"
+                : liquidityEvidenceAvailable
+                  ? "No active liquidity position"
+                  : "Liquidity status unavailable"
+            }
             detail={
               liquidityActive
                 ? "The position is in range and currently eligible to earn trading fees."
-                : "No liquidity position is present in the current evidence set."
+                : liquidityEvidenceAvailable
+                  ? "No liquidity position is present in the current evidence set."
+                  : "Bitflow did not return the range evidence required to determine whether a position is active."
             }
           />
         </div>
@@ -229,6 +313,15 @@ function RiskFact({ icon, title, detail }: { icon: IconName; title: string; deta
 }
 
 export function AllocationPanel({ summary }: { summary: PortfolioSummary }) {
+  const displayedAssets = summary.totalAssetsUsd ?? summary.valuedAssetsSubtotalUsd;
+  const partial = summary.totalAssetsUsd === null;
+  if (displayedAssets === null || summary.allocations.length === 0) {
+    return (
+      <DashboardPanel title="Asset allocation (USD)" className="ov-allocation">
+        <p className="ov-financial-empty">No supported position currently has acceptable USD evidence.</p>
+      </DashboardPanel>
+    );
+  }
   const segments = summary.allocations.length
     ? summary.allocations
     : [{ key: "Unvalued", valueUsd: "0", percentageBps: 10000, meaning: "" }];
@@ -241,12 +334,12 @@ export function AllocationPanel({ summary }: { summary: PortfolioSummary }) {
     })
     .join(", ");
   return (
-    <DashboardPanel title="Asset allocation (USD)" className="ov-allocation">
+    <DashboardPanel title={partial ? "Asset allocation (valued subset)" : "Asset allocation (USD)"} {...(partial ? { meta: "Partial coverage" } : {})} className="ov-allocation">
       <div className="ov-allocation-body">
         <div className="ov-allocation-ring" style={{ background: `conic-gradient(${stops})` }}>
           <div>
-            <strong>{formatUsd(summary.totalAssetsUsd)}</strong>
-            <span>assets</span>
+            <strong>{formatUsd(displayedAssets)}</strong>
+            <span>{partial ? "valued assets" : "assets"}</span>
           </div>
         </div>
         <div className="ov-allocation-list">
@@ -265,12 +358,22 @@ export function AllocationPanel({ summary }: { summary: PortfolioSummary }) {
 }
 
 export function DeploymentPanel({ summary }: { summary: PortfolioSummary }) {
+  const displayedDeployed = summary.deployedUsd ?? summary.valuedDeployedSubtotalUsd;
+  const displayedIdle = summary.idleUsd ?? summary.valuedIdleSubtotalUsd;
+  const partial = summary.totalAssetsUsd === null;
+  if (displayedDeployed === null || displayedIdle === null) {
+    return (
+      <DashboardPanel title="Deployed vs idle (USD)" meta="Unavailable" className="ov-deployment">
+        <p className="ov-financial-empty">No supported position currently has acceptable USD evidence.</p>
+      </DashboardPanel>
+    );
+  }
   const deployed = summary.deployment.deployedBps / 100;
   const idle = summary.deployment.idleBps / 100;
   return (
     <DashboardPanel
       title="Deployed vs idle (USD)"
-      meta={`${deployed.toFixed(1)}% deployed`}
+      meta={partial ? `${deployed.toFixed(1)}% of valued assets` : `${deployed.toFixed(1)}% deployed`}
       className="ov-deployment"
     >
       <div className="ov-split-bar">
@@ -279,11 +382,11 @@ export function DeploymentPanel({ summary }: { summary: PortfolioSummary }) {
       </div>
       <ValueRow
         label="Deployed"
-        value={formatUsd(summary.deployedUsd)}
+        value={formatUsd(displayedDeployed)}
         percentage={deployed}
         color="#09a875"
       />
-      <ValueRow label="Idle" value={formatUsd(summary.idleUsd)} percentage={idle} color="#7bdcbf" />
+      <ValueRow label="Idle" value={formatUsd(displayedIdle)} percentage={idle} color="#7bdcbf" />
     </DashboardPanel>
   );
 }
@@ -310,9 +413,17 @@ function ValueRow({
 }
 
 export function ProtocolPanel({ summary }: { summary: PortfolioSummary }) {
+  const partial = summary.totalAssetsUsd === null;
+  if (summary.protocols.length === 0) {
+    return (
+      <DashboardPanel title="Protocol exposure (USD)" className="ov-protocols">
+        <p className="ov-financial-empty">No supported protocol position currently has acceptable USD evidence.</p>
+      </DashboardPanel>
+    );
+  }
   const max = Math.max(...summary.protocols.map((item) => item.percentageBps), 1);
   return (
-    <DashboardPanel title="Protocol exposure (USD)" className="ov-protocols">
+    <DashboardPanel title={partial ? "Protocol exposure (valued subset)" : "Protocol exposure (USD)"} {...(partial ? { meta: "Partial coverage" } : {})} className="ov-protocols">
       <div className="ov-protocol-list">
         {summary.protocols.slice(0, 3).map((item) => (
           <div key={item.key}>
@@ -431,9 +542,18 @@ export function ZestPositionPanel({
 
 export function PortfolioDebtAndYield({ positions, onOpen }: { positions: Position[]; onOpen: () => void }) {
   const loans = positions.filter((position) => position.type === "lending");
-  const earningPositions = positions.filter(
+  const yieldPositions = positions.filter(
     (position) => position.type === "supply" || position.type === "liquidity",
   );
+  const earningCount = yieldPositions.filter((position) => {
+    const projection = yieldProjection(position);
+    return projection != null && projection.status !== "idle" && projection.status !== "unavailable";
+  }).length;
+  const idleCount = yieldPositions.length - earningCount;
+  const yieldMeta =
+    idleCount > 0
+      ? `${earningCount} earning · ${idleCount} idle`
+      : `${earningCount} earning position${earningCount === 1 ? "" : "s"}`;
   return (
     <section className="ov-financial-grid" aria-label="Borrowing and earnings">
       <DashboardPanel
@@ -476,14 +596,10 @@ export function PortfolioDebtAndYield({ positions, onOpen }: { positions: Positi
           )}
         </div>
       </DashboardPanel>
-      <DashboardPanel
-        title="Fees and lending yield"
-        meta={`${earningPositions.length} earning position${earningPositions.length === 1 ? "" : "s"}`}
-        className="ov-financial-panel"
-      >
+      <DashboardPanel title="Fees and lending yield" meta={yieldMeta} className="ov-financial-panel">
         <div className="ov-financial-list">
-          {earningPositions.length ? (
-            earningPositions.map((position) => {
+          {yieldPositions.length ? (
+            yieldPositions.map((position) => {
               const projection = yieldProjection(position);
               const label =
                 position.type === "supply"
@@ -493,7 +609,13 @@ export function PortfolioDebtAndYield({ positions, onOpen }: { positions: Positi
                 projection?.projected30dUsd != null
                   ? formatUsd(projection.projected30dUsd)
                   : (projection?.projected30dAsset ??
-                    (projection?.status === "paused" ? "Paused out of range" : "Unavailable"));
+                    (projection?.status === "paused"
+                      ? "Paused out of range"
+                      : projection?.status === "idle"
+                        ? "No current lending yield"
+                        : projection?.status === "reported"
+                          ? "Not projected — rate unverified"
+                          : "Unavailable"));
               return (
                 <button key={position.id} onClick={onOpen}>
                   <span className="ov-financial-icon">
@@ -509,7 +631,7 @@ export function PortfolioDebtAndYield({ positions, onOpen }: { positions: Positi
                     <strong>
                       {projection?.earnedToDateUsd != null
                         ? formatUsd(projection.earnedToDateUsd)
-                        : "Needs history"}
+                        : "History required"}
                     </strong>
                     <small>Projected 30 days</small>
                     <strong>{projected}</strong>
@@ -521,10 +643,11 @@ export function PortfolioDebtAndYield({ positions, onOpen }: { positions: Positi
             <p className="ov-financial-empty">No supply or liquidity positions found.</p>
           )}
         </div>
-        {earningPositions.length ? (
+        {yieldPositions.length ? (
           <p className="ov-financial-note">
-            Projections hold the current evidenced rate and position value constant. They are estimates, not
-            guaranteed returns.
+            “Earned to date” requires canonical deposits, withdrawals, share-rate changes, fees and incentives;
+            a balance increase alone is not called yield. Idle vaults show a verified 0% supply APR because
+            borrow demand or utilization is currently zero — not because the rate failed to load.
           </p>
         ) : null}
       </DashboardPanel>

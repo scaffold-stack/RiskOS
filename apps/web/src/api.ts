@@ -1,6 +1,20 @@
-import type { AlertOccurrence, AlertRule, PortfolioSummary, PositionEnvelope, RiskFinding, TransactionIntent, WalletChallenge, WalletSessionView, WalletTransactionRequest } from "../../../packages/domain/src/index.js";
+import type {
+  AlertOccurrence,
+  AlertRule,
+  PortfolioSummary,
+  PositionEnvelope,
+  RiskFinding,
+  TransactionIntent,
+  WalletChallenge,
+  WalletSessionView,
+  WalletTransactionRequest,
+} from "../../../packages/domain/src/index.js";
 
-const API_URL = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:3001`;
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  (typeof window === "undefined"
+    ? "http://127.0.0.1:3001"
+    : `${window.location.protocol}//${window.location.hostname}:3001`);
 
 export interface SbtcOperationView {
   operationKey: string;
@@ -18,6 +32,107 @@ export interface SbtcOperationView {
   bitcoin: Array<{ txid: string; confirmations: number; confirmed: boolean }>;
 }
 
+export interface PortfolioHistoryResponse {
+  address: string;
+  observations: Array<{
+    indexBlockHash: string;
+    blockHeight: number;
+    observedAt: string;
+    registryVersion: string;
+    positions: PositionEnvelope["positions"];
+    valuedNetSubtotalUsd: string | null;
+    valuedAssetsSubtotalUsd: string | null;
+    valuedDebtSubtotalUsd: string | null;
+    valuedPositionCount: number;
+    excludedPositionCount: number;
+    complete: boolean;
+  }>;
+  cashFlows: Array<{
+    protocol: "zest" | "bitflow";
+    kind: string;
+    blockHeight: number;
+    indexBlockHash: string;
+    transactionId: string;
+    positionKey: string;
+    amounts: Record<string, unknown>;
+  }>;
+  integrity: {
+    canonicalOnly: true;
+    reorgInvalidatedSnapshotsExcluded: true;
+    state: "observations-available" | "baseline-only" | "no-baseline";
+  };
+  earnedYield: {
+    valueUsd: null;
+    state: "attribution-required" | "cash-flow-history-required";
+    meaning: string;
+  };
+}
+
+export interface YieldMarketView {
+  id: string;
+  protocol: string;
+  kind: "lending" | "liquidity" | "stacking";
+  assets: string;
+  annualizedRateBps: number | null;
+  rateLabel: "Supply APR" | "Fee APR" | "Reward APY";
+  evidenceState: "verified" | "provider-reported" | "unavailable";
+  confidenceScore: number;
+  observedAtBlock: number | null;
+  observedAt: string;
+  tvlUsd: string | null;
+  independentRateEvidence: {
+    source: string;
+    observedAt: string;
+    annualizedRateBps: number;
+    differenceBps: number;
+  } | null;
+  capacityEvidence: { source: string; observedAt: string; tvlUsd: string } | null;
+  source: string;
+  meaning: string;
+  eligibleForAllocation: boolean;
+  allocationExclusionReason?: string | null;
+}
+
+export interface YieldAllocationPlanView {
+  capitalUsd: string;
+  days: 30 | 90 | 365;
+  mode?: "explore" | "recommend";
+  allocatedUsd: string;
+  unallocatedUsd: string;
+  projectedGrossEarningsUsd: string;
+  weightedAnnualizedRateBps: number;
+  generatedAt: string;
+  evidenceAsOf: string | null;
+  allocations: Array<{
+    marketId: string;
+    protocol: string;
+    kind: YieldMarketView["kind"];
+    assets: string;
+    amountUsd: string;
+    shareBps: number;
+    annualizedRateBps: number;
+    rateLabel: YieldMarketView["rateLabel"];
+    projectedGrossEarningsUsd: string;
+    evidenceState: YieldMarketView["evidenceState"];
+    confidenceScore: number;
+    observedAt: string;
+    observedAtBlock: number | null;
+    reportedTvlUsd: string | null;
+    reportedTvlCapacityUsd: string | null;
+    source: string;
+    independentRateEvidence: YieldMarketView["independentRateEvidence"];
+    capacityEvidence: YieldMarketView["capacityEvidence"];
+  }>;
+  markets: YieldMarketView[];
+  policy: {
+    objective: string;
+    maximumProtocolShareBps: number;
+    maximumMarketShareBps: number;
+    maximumPoolTvlShareBps: number;
+  };
+  warnings: string[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -30,14 +145,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function createWalletChallenge(address: string) {
-  return request<WalletChallenge>("/v1/auth/challenge", { method: "POST", body: JSON.stringify({ address }) });
+  return request<WalletChallenge>("/v1/auth/challenge", {
+    method: "POST",
+    body: JSON.stringify({ address }),
+  });
 }
 
-export function verifyWalletChallenge(input: { challengeId: string; address: string; publicKey: string; signature: string }) {
+export function verifyWalletChallenge(input: {
+  challengeId: string;
+  address: string;
+  publicKey: string;
+  signature: string;
+}) {
   return request<WalletSessionView>("/v1/auth/verify", { method: "POST", body: JSON.stringify(input) });
 }
 
-export function getWalletSession() { return request<WalletSessionView>("/v1/auth/session"); }
+export function getWalletSession() {
+  return request<WalletSessionView>("/v1/auth/session");
+}
 export async function logoutWalletSession() {
   const response = await fetch(`${API_URL}/v1/auth/logout`, { method: "POST", credentials: "include" });
   if (!response.ok) throw new Error("Unable to close the wallet session");
@@ -67,6 +192,35 @@ export function getPortfolioSummary(address: string) {
   return request<PortfolioSummary>(`/v1/address/${encodeURIComponent(address)}/portfolio`);
 }
 
+export function getAddressOverview(address: string, signal?: AbortSignal) {
+  return request<{
+    address: string;
+    positions: PositionEnvelope;
+    risks: RiskFinding[];
+    portfolio: PortfolioSummary;
+  }>(`/v1/address/${encodeURIComponent(address)}/overview`, signal ? { signal } : undefined);
+}
+
+export function getPortfolioHistory(address: string, limit = 30, signal?: AbortSignal) {
+  return request<PortfolioHistoryResponse>(
+    `/v1/address/${encodeURIComponent(address)}/history?limit=${limit}`,
+    signal ? { signal } : undefined,
+  );
+}
+
+export function getYieldAllocation(
+  capitalUsd: string,
+  days: 30 | 90 | 365,
+  signal?: AbortSignal,
+  mode: "explore" | "recommend" = "explore",
+) {
+  return request<YieldAllocationPlanView>("/v1/yield/allocations", {
+    method: "POST",
+    body: JSON.stringify({ capitalUsd, days, mode }),
+    ...(signal ? { signal } : {}),
+  });
+}
+
 export function planRepayAction(address: string, positionId: string, amountAtomic: string) {
   return request<TransactionIntent>("/v1/actions/plan", {
     method: "POST",
@@ -87,16 +241,34 @@ export function getSbtcOperations(address: string) {
   );
 }
 
-export interface AlertsResponse { address: string; rules: AlertRule[]; occurrences: AlertOccurrence[]; }
-export function getAlerts() { return request<AlertsResponse>("/v1/alerts"); }
-export function createAlertRule(input: { name: string; categories: RiskFinding["category"][]; minimumSeverity: RiskFinding["severity"] }) {
-  return request<{ rule: AlertRule; occurrences: AlertOccurrence[] }>("/v1/alerts/rules", { method: "POST", body: JSON.stringify(input) });
+export interface AlertsResponse {
+  address: string;
+  rules: AlertRule[];
+  occurrences: AlertOccurrence[];
+}
+export function getAlerts() {
+  return request<AlertsResponse>("/v1/alerts");
+}
+export function createAlertRule(input: {
+  name: string;
+  categories: RiskFinding["category"][];
+  minimumSeverity: RiskFinding["severity"];
+}) {
+  return request<{ rule: AlertRule; occurrences: AlertOccurrence[] }>("/v1/alerts/rules", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function getWalletRequest(intentId: string) {
-  return request<WalletTransactionRequest>(`/v1/actions/${encodeURIComponent(intentId)}/wallet-request`, { method: "POST" });
+  return request<WalletTransactionRequest>(`/v1/actions/${encodeURIComponent(intentId)}/wallet-request`, {
+    method: "POST",
+  });
 }
 
 export function recordSubmission(intentId: string, txid: string) {
-  return request<{ intentId: string; state: string; txid: string; reconciliation: string }>(`/v1/actions/${encodeURIComponent(intentId)}/submissions`, { method: "POST", body: JSON.stringify({ txid }) });
+  return request<{ intentId: string; state: string; txid: string; reconciliation: string }>(
+    `/v1/actions/${encodeURIComponent(intentId)}/submissions`,
+    { method: "POST", body: JSON.stringify({ txid }) },
+  );
 }

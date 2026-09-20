@@ -1,20 +1,36 @@
 import type { Position, RiskFinding } from "../../../../packages/domain/src/index.js";
 import type { StatusTone } from "../components/Ui.js";
 
-export function humanAmount(amountAtomic: string, decimals: number, maximumFractionDigits = 6): string {
-  const padded = amountAtomic.padStart(decimals + 1, "0");
+/**
+ * Format an on-chain atomic amount for display. Defaults to magnitude-aware
+ * precision and strips trailing zeros so balances stay readable in tables.
+ */
+export function humanAmount(amountAtomic: string, decimals: number, maximumFractionDigits?: number): string {
+  const normalized = amountAtomic.replace(/^0+(?=\d)/, "") || "0";
+  if (!/^\d+$/.test(normalized)) return amountAtomic;
+  const padded = normalized.padStart(decimals + 1, "0");
   const whole = padded.slice(0, -decimals) || "0";
-  const rawFraction = decimals === 0 ? "" : padded.slice(-decimals).replace(/0+$/, "");
-  const fraction = rawFraction.slice(0, maximumFractionDigits);
-  return fraction ? `${whole}.${fraction}` : whole;
+  const rawFraction = decimals === 0 ? "" : padded.slice(-decimals);
+  const wholeValue = Number(whole);
+  const digits =
+    maximumFractionDigits ??
+    (wholeValue >= 1_000 ? 2 : wholeValue >= 1 ? 4 : 6);
+  const fraction = rawFraction.slice(0, Math.max(0, digits)).replace(/0+$/, "");
+  const wholeFormatted = wholeValue.toLocaleString("en-US");
+  return fraction ? `${wholeFormatted}.${fraction}` : wholeFormatted;
 }
 
 export function formatUsd(value: string | null | undefined): string {
-  if (value == null) return "n/a";
+  if (value == null) return "Unavailable";
   const number = Number(value);
   if (!Number.isFinite(number)) return `$${value}`;
   const magnitude = Math.abs(number).toLocaleString(undefined, { maximumFractionDigits: 2 });
   return number < 0 ? `−$${magnitude}` : `$${magnitude}`;
+}
+
+export function formatPct(value: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(digits)}%`;
 }
 
 export function primaryAsset(position: Position) {

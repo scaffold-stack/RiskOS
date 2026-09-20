@@ -69,4 +69,30 @@ describe("production configuration", () => {
       REGISTRY_TRUSTED_KEY_FINGERPRINTS: "abc",
     })).toThrow(/HIRO_API_KEY/);
   });
+
+  it("requires an independent state provider but permits the free market quorum without paid Pyth", () => {
+    const base = {
+      NODE_ENV: "production",
+      DATA_MODE: "live",
+      WEB_ORIGIN: "https://riskos.example",
+      DATABASE_URL: "postgresql://database/riskos",
+      CHAINHOOK_BEARER_TOKEN: "a".repeat(32),
+      OPERATIONS_BEARER_TOKEN: "b".repeat(32),
+      REGISTRY_TRUSTED_KEY_FINGERPRINTS: "abc",
+      HIRO_API_KEY: "hiro-key",
+    };
+    expect(() => loadRuntimeConfig(base)).toThrow(/STACKS_REFERENCE_API_URL/);
+    expect(() => loadRuntimeConfig({
+      ...base,
+      STACKS_REFERENCE_API_URL: "https://reference.example",
+    })).not.toThrow();
+    expect(() => loadRuntimeConfig({
+      ...base,
+      STACKS_REFERENCE_API_URL: "https://api.mainnet.hiro.so/",
+    })).toThrow(/different deployment/);
+    expect(() => loadRuntimeConfig({
+      ...base,
+      STACKS_REFERENCE_API_URL: "https://docs-demo.stacks-mainnet.quiknode.pro",
+    })).toThrow(/public documentation endpoint/);
+  });
 });

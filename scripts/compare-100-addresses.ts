@@ -7,7 +7,7 @@ import {
   runAddressComparisonGate,
 } from "../packages/data-foundation/src/address-comparison.js";
 import { unwrapRegistryPayload } from "../packages/data-foundation/src/registry.js";
-import { DiaOraclePriceBook, enrichPositionsWithUsd, ZestVaultExchangeRatePriceBook } from "../packages/pricing/src/index.js";
+import { DiaOraclePriceBook, enrichPositionsWithUsd, StackingDaoExchangeRatePriceBook, ZestVaultExchangeRatePriceBook } from "../packages/pricing/src/index.js";
 
 const inputPath = process.argv[2] ?? "fixtures/mainnet-100-addresses.json";
 const outputPath = process.argv[3] ?? "artifacts/mainnet-100-address-comparison.json";
@@ -23,10 +23,17 @@ async function adapterDiscover() {
   const manifest = unwrapRegistryPayload(payload).manifest;
   const stacksUrl = process.env.STACKS_API_URL ?? "https://api.mainnet.hiro.so";
   const client = new StacksReadOnlyClient(stacksUrl, fetch, process.env.HIRO_API_KEY);
+  const referenceClient = process.env.STACKS_REFERENCE_API_URL
+    ? new StacksReadOnlyClient(
+        process.env.STACKS_REFERENCE_API_URL,
+        fetch,
+        process.env.STACKS_REFERENCE_API_KEY,
+      )
+    : undefined;
   const provider = async () => manifest;
   const adapters = [
     new StacksApiAdapter(stacksUrl, fetch, process.env.HIRO_API_KEY, async () =>
-      manifest.entries.flatMap((entry) => entry.assetDefinitions)),
+      manifest.entries.flatMap((entry) => entry.assetDefinitions), async () => [], referenceClient),
     new ZestMainnetAdapter(provider, client),
     new BitflowMainnetAdapter(
       provider,
@@ -35,9 +42,14 @@ async function adapterDiscover() {
       fetch,
       stacksUrl,
       process.env.HIRO_API_KEY,
+      referenceClient,
     ),
   ];
-  const priceBook = new ZestVaultExchangeRatePriceBook(new DiaOraclePriceBook(client), client, provider);
+  const priceBook = new ZestVaultExchangeRatePriceBook(
+    new StackingDaoExchangeRatePriceBook(new DiaOraclePriceBook(client), client, provider),
+    client,
+    provider,
+  );
   return async (address: string) => {
     const settled = await Promise.allSettled(adapters.map((adapter) => adapter.discover(address)));
     const positions = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
@@ -67,10 +79,13 @@ if (mode === "http") {
   independence = "http-api-vs-direct-adapters";
 } else {
   const discover = await adapterDiscover();
-  const cache = new Map<string, Awaited<ReturnType<typeof discover>>>();
-  const once = async (address: string) => {
-    if (!cache.has(address)) cache.set(address, await discover(address));
-    return cache.get(address)!;
+  const cache = new Map<string, Promise<Awaited<ReturnType<typeof discover>>>>();
+  const once = (address: string) => {
+    const existing = cache.get(address);
+    if (existing) return existing;
+    const pending = discover(address);
+    cache.set(address, pending);
+    return pending;
   };
   candidate = new CallbackPositionSource(once);
   reference = new CallbackPositionSource(async (address) => structuredClone(await once(address)));

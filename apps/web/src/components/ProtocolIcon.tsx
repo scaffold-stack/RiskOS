@@ -1,6 +1,7 @@
 const protocolArtwork = {
   bitflow: "/assets/protocols/bitflow.svg",
   bitcoin: "/assets/tokens/btc.png",
+  hermetica: "/assets/protocols/hermetica.svg",
   sbtc: "/assets/protocols/sbtc.png",
   stacks: "/assets/protocols/stacks.png",
   stackingdao: "/assets/protocols/stackingdao.svg",
@@ -19,6 +20,7 @@ function protocolKey(protocol: string): keyof typeof protocolArtwork | null {
   const normalized = protocol.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (normalized.includes("bitflow")) return "bitflow";
   if (normalized === "bitcoin" || normalized === "btc") return "bitcoin";
+  if (normalized.includes("hermetica")) return "hermetica";
   if (normalized.includes("stackingdao")) return "stackingdao";
   if (normalized.includes("zest")) return "zest";
   if (normalized.includes("sbtc")) return "sbtc";

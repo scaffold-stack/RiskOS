@@ -8,7 +8,7 @@ export interface YieldProjection {
   earnedToDateUsd: string | null;
   projected30dUsd: string | null;
   projected30dAsset: string | null;
-  status: "earning" | "paused" | "unavailable";
+  status: "earning" | "idle" | "losing" | "paused" | "reported" | "unavailable";
   meaning: string;
 }
 
@@ -23,15 +23,35 @@ export function yieldProjection(position: Position): YieldProjection | null {
     position.type !== "liquidity" ||
     (Number(position.currentPrice) >= Number(position.lowerPrice) &&
       Number(position.currentPrice) <= Number(position.upperPrice));
-  const status = annualizedRateBps == null ? "unavailable" : inRange ? "earning" : "paused";
+  const rateVerified = position.earnings?.confidence.state === "verified";
+  const providerRateUsable =
+    rateKind === "provider-apy" &&
+    position.earnings?.confidence.state === "estimated" &&
+    position.earnings.confidence.score >= 0.75;
+  const status =
+    annualizedRateBps == null
+      ? "unavailable"
+      : !inRange
+        ? "paused"
+        : annualizedRateBps < 0
+          ? "losing"
+          : annualizedRateBps === 0
+            ? "idle"
+            : !rateVerified
+              ? "reported"
+              : "earning";
   let projected30dUsd: string | null = null;
   let projected30dAsset: string | null = null;
 
-  if (annualizedRateBps != null && inRange) {
+  if (annualizedRateBps != null && annualizedRateBps !== 0 && inRange && (rateVerified || providerRateUsable)) {
     if (position.type === "supply") {
-      const projectedAtomic = simpleInterestAtomic(position.asset.amountAtomic, annualizedRateBps, 30);
-      projected30dAsset = `${humanAmount(projectedAtomic, position.asset.decimals, position.asset.decimals)} ${position.asset.asset}`;
-      projected30dUsd = simpleInterestUsd(position.asset.valueUsd, annualizedRateBps, 30);
+      if (rateKind === "provider-apy" || rateKind === "realized-apy") {
+        projected30dUsd = apyProjectionUsd(position.asset.valueUsd, annualizedRateBps, 30);
+      } else {
+        const projectedAtomic = simpleInterestAtomic(position.asset.amountAtomic, annualizedRateBps, 30);
+        projected30dAsset = `${humanAmount(projectedAtomic, position.asset.decimals, position.asset.decimals)} ${position.asset.asset}`;
+        projected30dUsd = simpleInterestUsd(position.asset.valueUsd, annualizedRateBps, 30);
+      }
     } else {
       const valueUsd = addUsd(position.token0.valueUsd, position.token1.valueUsd);
       projected30dUsd = apyProjectionUsd(valueUsd, annualizedRateBps, 30);
@@ -42,7 +62,11 @@ export function yieldProjection(position: Position): YieldProjection | null {
     annualRateLabel:
       annualizedRateBps == null
         ? "Rate unavailable"
-        : `${(annualizedRateBps / 100).toFixed(2)}% ${rateKind === "supply-apr" ? "supply APR" : "reported APY"}`,
+        : annualizedRateBps === 0
+          ? rateKind === "supply-apr"
+            ? "Idle vault · no borrowers"
+            : "0.00% current APY"
+          : `${(annualizedRateBps / 100).toFixed(2)}% ${rateKind === "supply-apr" ? "supply APR" : rateKind === "realized-apy" ? "realized APY" : "provider-reported APY"}`,
     earnedToDateUsd: position.earnings?.earnedToDateUsd ?? null,
     projected30dUsd,
     projected30dAsset,

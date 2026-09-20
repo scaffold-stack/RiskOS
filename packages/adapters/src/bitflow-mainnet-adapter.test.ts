@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { listCV, responseOkCV, tupleCV, uintCV } from "@stacks/transactions";
 import { registryManifestSchema } from "../../data-foundation/src/registry.js";
 import { BitflowMainnetAdapter } from "./bitflow-mainnet-adapter.js";
 
@@ -85,8 +86,13 @@ describe("BitflowMainnetAdapter", () => {
       lowerPrice: "71418.653603",
       upperPrice: "90689.326801",
       currentPrice: "81165.893955",
-      earnings: { annualizedRateBps: 4089, rateKind: "provider-apy", earnedToDateUsd: null },
-      confidence: { state: "verified" },
+      earnings: {
+        annualizedRateBps: 4089,
+        rateKind: "provider-apy",
+        earnedToDateUsd: null,
+        confidence: { state: "estimated" },
+      },
+      confidence: { state: "estimated" },
     });
     expect(positions[0]?.provenance[0]).toMatchObject({ blockHeight: 8915546, source: "quote" });
     expect(positions[0]?.provenance.some((item) => item.source === "stacks-api")).toBe(true);
@@ -122,5 +128,80 @@ describe("BitflowMainnetAdapter", () => {
         "https://stacks.test",
       ).discover("SP000000000000000000002Q6VF78"),
     ).rejects.toThrow(/unapproved pool contract/);
+  });
+
+  it("ignores explicit zero-liquidity placeholders before range and allowlist validation", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          positions: [
+            {
+              poolId: "unheld-pool",
+              poolContract: "SP000000000000000000002Q6VF78.not-a-position",
+              priceRangeMin: null,
+              priceRangeMax: null,
+              liquidityTokenX: 0,
+              liquidityTokenY: 0,
+              valueUsd: 0,
+              apy: 0,
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const positions = await new BitflowMainnetAdapter(
+      async () => manifest,
+      "https://app.test",
+      "https://quotes.test",
+      request,
+      "https://stacks.test",
+    ).discover("SP000000000000000000002Q6VF78");
+    expect(positions).toEqual([]);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconstructs current-schema positions from pro-rata canonical bin balances", async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/tokens/nft/holdings")) return new Response(JSON.stringify({ results: [{ asset_identifier: `${poolContract}::pool-token-id` }] }));
+      if (url.endsWith("/positions")) return new Response(JSON.stringify({ positions: [{
+        poolId: poolContract, poolContract, priceRangeMin: 70_000, priceRangeMax: 90_000,
+        tokens: { tokenX: { symbol: "sBTC" }, tokenY: { symbol: "USDCx" } }, valueUsd: null,
+      }] }));
+      if (url === "https://quotes.test/v1/pools") return new Response(JSON.stringify({
+        pools: [{ pool_id: "dlmm_1", pool_token: poolContract }],
+      }));
+      if (url.includes("/bins/")) return new Response(JSON.stringify({ success: true, pool_id: "dlmm_1", price: "80000000000", applied_block_height: 900 }));
+      return new Response(JSON.stringify({ poolId: "dlmm_1", poolContract, tokens: {
+        tokenX: { contract: "sbtc", symbol: "sBTC", decimals: 8 },
+        tokenY: { contract: "usdcx", symbol: "USDCx", decimals: 6 },
+      } }));
+    });
+    const canonicalManifest = registryManifestSchema.parse({
+      ...manifest,
+      entries: manifest.entries.map((entry) => ({ ...entry, readOnlyFunctions: ["get-user-bins", "get-bin-balances", "get-balance"] })),
+    });
+    const consensusClient = { pinTip: vi.fn(async () => ({
+      blockHeight: 901,
+      call: vi.fn(async (_contract: string, functionName: string) =>
+        functionName === "get-user-bins"
+          ? responseOkCV(listCV([uintCV(7)]))
+          : functionName === "get-balance"
+            ? responseOkCV(uintCV(25))
+            : responseOkCV(tupleCV({ "bin-shares": uintCV(100), "x-balance": uintCV(400), "y-balance": uintCV(800) }))),
+    })) };
+    const positions = await new BitflowMainnetAdapter(
+      async () => canonicalManifest, "https://app.test", "https://quotes.test", request,
+      "https://stacks.test", undefined, consensusClient as never,
+    ).discover("SP000000000000000000002Q6VF78");
+    expect(positions[0]).toMatchObject({
+      token0: { amountAtomic: "100" },
+      token1: { amountAtomic: "200" },
+      lowerPrice: "70000",
+      upperPrice: "90000",
+      confidence: { state: "verified" },
+      provenance: expect.arrayContaining([expect.objectContaining({ source: "contract-read", blockHeight: 901 })]),
+    });
   });
 });

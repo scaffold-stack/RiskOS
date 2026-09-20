@@ -16,7 +16,13 @@
 | Web | [Cloudflare Pages](https://pages.cloudflare.com) | `npm run build:web` → `apps/web/dist` |
 | Prices / chain | Hiro key, QuickNode reference, CoinGecko, Coinbase, DefiLlama | already free/public endpoints |
 
-Wallet httpOnly cookies need the web and API on the **same registrable domain**. On free `*.pages.dev` + `*.fly.dev` origins, public address inspect works; Connect wallet sessions may not until you attach a custom domain (also free on Cloudflare). Add every approved browser embed origin to the comma-separated `WEB_ORIGIN` allowlist; paid API keys must remain server-side.
+Wallet httpOnly cookies need the web and API on the **same registrable domain**.
+On free `*.pages.dev` + `*.fly.dev` origins, the web app keeps the short-lived
+wallet bearer token in tab-scoped `sessionStorage` after signed verification,
+so reloads remain connected without persisting the token across browser
+sessions. Expired and rejected tokens are removed automatically. A custom
+domain restores the preferred httpOnly-cookie flow. Add every approved browser embed origin to the comma-separated
+`WEB_ORIGIN` allowlist; paid API keys must remain server-side.
 
 ## 0. Preconditions
 

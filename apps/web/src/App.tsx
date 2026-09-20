@@ -427,6 +427,8 @@ export function App() {
         apiBaseUrl={
           import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:3001`
         }
+        walletConnected={walletSession !== null}
+        onConnect={connectWallet}
         onProtect={() => navigate("protect")}
         onPlans={() => navigate("pricing")}
       />

@@ -52,4 +52,25 @@ describe("PostgreSQL commercial foundation", () => {
 
     await expect(service.walletPlan("UNKNOWN")).resolves.toMatchObject({ plan: { id: "free" } });
   });
+
+  it("scopes self-service API key management to the owning wallet", async () => {
+    const service = new CommercialService(store, () => new Date("2026-09-20T12:00:00Z"));
+    await service.grantWalletPlan({ address: "SPDEVELOPER", plan: "developer" });
+    const created = await service.createWalletApiKey("SPDEVELOPER", "Production");
+    await expect(service.walletApiKeys("SPDEVELOPER")).resolves.toMatchObject([
+      { key: { keyId: created.key.keyId, ownerAddress: "SPDEVELOPER" } },
+    ]);
+    await expect(service.walletApiKeys("SPOTHER")).resolves.toEqual([]);
+    await expect(service.revokeWalletApiKey("SPOTHER", created.key.keyId)).resolves.toBe(false);
+    await expect(service.revokeWalletApiKey("SPDEVELOPER", created.key.keyId)).resolves.toBe(true);
+  });
+
+  it("persists one free-plan API key per wallet", async () => {
+    const service = new CommercialService(store, () => new Date("2026-09-20T12:00:00Z"));
+    const created = await service.createWalletApiKey("SPFREE", "Free integration");
+    expect(created.key).toMatchObject({ plan: "free", monthlyRequestLimit: 1_000 });
+    await expect(service.createWalletApiKey("SPFREE", "Second free integration")).rejects.toThrow(
+      "API_KEY_LIMIT_REACHED",
+    );
+  });
 });

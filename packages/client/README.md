@@ -32,7 +32,10 @@ const riskos = new RiskOsClient({
 });
 ```
 
-Never expose a server API key in browser code. Browser wallet workflows should use `credentials: "include"` and the signed wallet challenge methods instead.
+Never expose a server API key in browser code. Browser wallet workflows should
+use the signed wallet challenge methods instead. `verifyWalletChallenge`
+returns a short-lived token for in-memory `Authorization: Bearer ...` use; do
+not persist that token in local storage.
 
 ## Browser embeds and CORS
 
@@ -41,7 +44,8 @@ protocol origin that embeds the read-only widget must be listed in the API's
 comma-separated `WEB_ORIGIN` allowlist. Keep paid API keys on a server-side
 proxy; never solve an origin error by shipping a key in frontend JavaScript.
 Wallet-session cookies additionally require the web app and API to use HTTPS
-origins under the same registrable domain.
+origins under the same registrable domain. Approved cross-origin clients can
+use the short-lived wallet bearer token returned after signature verification.
 
 ## Reliability behavior
 
@@ -55,8 +59,9 @@ origins under the same registrable domain.
 
 - `health`
 - `getPlans`, `getDeveloperUsage`, `getAccountPlan`
+- `getAccountApiKeys`, `createAccountApiKey`, `revokeAccountApiKey`
 - `getOverview`, `getPositions`, `getRisk`, `getPortfolio`, `getHistory`
-- `getYieldMarkets`, `createYieldAllocation`
+- `getYieldMarkets`, `getYieldStrategies`, `createYieldAllocation`
 - `createWalletChallenge`, `verifyWalletChallenge`, `getWalletSession`, `logoutWalletSession`
 - `getAlerts`, `createAlertRule`
 - `getPortfolioEvidenceReport`

@@ -1,9 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RiskOsWidget } from "../../../../packages/widget/src/index.js";
 import { Icon, type IconName } from "../components/Icons.js";
 import { PageHeader, StatusChip } from "../components/Ui.js";
+import {
+  createAccountApiKey,
+  getAccountApiKeys,
+  revokeAccountApiKey,
+  type AccountApiKeysResponse,
+} from "../api.js";
 
-type DeveloperTab = "quickstart" | "explorer" | "reference" | "widget" | "guides";
+type DeveloperTab = "quickstart" | "access" | "explorer" | "reference" | "widget" | "guides";
 type Access = "Public" | "API key" | "Wallet session" | "Paid wallet";
 
 interface SdkMethod {
@@ -24,6 +30,7 @@ const sdkMethods: SdkMethod[] = [
   { name: "getRisk", group: "Risk", signature: "(address, options?)", description: "Deterministic liquidation, liquidity, oracle, bridge, and support findings.", access: "Public" },
   { name: "getPortfolioEvidenceReport", group: "Risk", signature: "(options?)", description: "Owner-authenticated report containing current portfolio and evidence.", access: "Paid wallet" },
   { name: "getYieldMarkets", group: "Yield", signature: "(options?)", description: "Current allowlisted market universe with rates, confidence, and capacity.", access: "Public" },
+  { name: "getYieldStrategies", group: "Yield", signature: "(options?)", description: "Evidence-derived earning strategies with explore and recommendation availability.", access: "Public" },
   { name: "createYieldAllocation", group: "Yield", signature: "({ capitalUsd, days, mode }, options?)", description: "Evidence-labeled simulation or corroborated recommendation.", access: "API key" },
   { name: "createWalletChallenge", group: "Authentication", signature: "(address, options?)", description: "Creates a one-time, domain-bound Stacks ownership message.", access: "Public" },
   { name: "verifyWalletChallenge", group: "Authentication", signature: "(proof, options?)", description: "Verifies ownership and creates a short-lived httpOnly session.", access: "Public" },
@@ -39,6 +46,9 @@ const sdkMethods: SdkMethod[] = [
   { name: "getPlans", group: "Commercial", signature: "(options?)", description: "Current plan catalogue and enforceable product limits.", access: "Public" },
   { name: "getDeveloperUsage", group: "Commercial", signature: "(options?)", description: "Current API-key allowance, usage, and renewal period.", access: "API key" },
   { name: "getAccountPlan", group: "Commercial", signature: "(options?)", description: "Effective wallet plan and entitlement information.", access: "Wallet session" },
+  { name: "getAccountApiKeys", group: "Commercial", signature: "(options?)", description: "Lists wallet-owned keys and their current monthly usage.", access: "Wallet session" },
+  { name: "createAccountApiKey", group: "Commercial", signature: "(name, options?)", description: "Creates a wallet-owned API key and returns its secret once.", access: "Paid wallet" },
+  { name: "revokeAccountApiKey", group: "Commercial", signature: "(keyId, options?)", description: "Permanently revokes an API key owned by the wallet.", access: "Paid wallet" },
 ];
 
 const workflows: Array<{ icon: IconName; title: string; description: string; methods: string }> = [
@@ -53,6 +63,7 @@ const explorerEndpoints = [
   { id: "risk", label: "Risk findings", method: "GET", path: (address: string) => `/v1/address/${encodeURIComponent(address)}/risk` },
   { id: "portfolio", label: "Portfolio summary", method: "GET", path: (address: string) => `/v1/address/${encodeURIComponent(address)}/portfolio` },
   { id: "markets", label: "Yield markets", method: "GET", path: () => "/v1/yield/markets" },
+  { id: "strategies", label: "Yield strategies", method: "GET", path: () => "/v1/yield/strategies" },
   { id: "plans", label: "Product plans", method: "GET", path: () => "/v1/plans" },
   { id: "health", label: "Service health", method: "GET", path: () => "/health" },
 ] as const;
@@ -106,11 +117,15 @@ function AccessBadge({ access }: { access: Access }) {
 export function IntegrationsPage({
   address,
   apiBaseUrl,
+  walletConnected,
+  onConnect,
   onProtect,
   onPlans,
 }: {
   address: string;
   apiBaseUrl: string;
+  walletConnected: boolean;
+  onConnect: () => Promise<void>;
   onProtect: () => void;
   onPlans: () => void;
 }) {
@@ -123,6 +138,63 @@ export function IntegrationsPage({
   const [explorerStatus, setExplorerStatus] = useState("");
   const [explorerBusy, setExplorerBusy] = useState(false);
   const [widgetTheme, setWidgetTheme] = useState<"stacks" | "host">("stacks");
+  const [access, setAccess] = useState<AccountApiKeysResponse | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newSecret, setNewSecret] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [revokingKeyId, setRevokingKeyId] = useState("");
+
+  useEffect(() => {
+    if (tab !== "access" || !walletConnected) return;
+    let cancelled = false;
+    setAccessLoading(true);
+    setAccessError("");
+    void getAccountApiKeys()
+      .then((response) => {
+        if (!cancelled) setAccess(response);
+      })
+      .catch((cause) => {
+        if (!cancelled) setAccessError(cause instanceof Error ? cause.message : "Unable to load API access");
+      })
+      .finally(() => {
+        if (!cancelled) setAccessLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, walletConnected]);
+
+  async function createKey() {
+    if (!newKeyName.trim()) return;
+    setCreatingKey(true);
+    setAccessError("");
+    try {
+      const created = await createAccountApiKey(newKeyName.trim());
+      setNewSecret(created.apiKey);
+      setNewKeyName("");
+      setAccess(await getAccountApiKeys());
+    } catch (cause) {
+      setAccessError(cause instanceof Error ? cause.message : "Unable to create API key");
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  async function revokeKey(keyId: string) {
+    if (!window.confirm("Revoke this API key? Applications using it will immediately lose access.")) return;
+    setRevokingKeyId(keyId);
+    setAccessError("");
+    try {
+      await revokeAccountApiKey(keyId);
+      setAccess(await getAccountApiKeys());
+    } catch (cause) {
+      setAccessError(cause instanceof Error ? cause.message : "Unable to revoke API key");
+    } finally {
+      setRevokingKeyId("");
+    }
+  }
 
   const filteredMethods = useMemo(() => {
     const query = methodQuery.trim().toLowerCase();
@@ -196,7 +268,7 @@ export function IntegrationsPage({
 
       <section className="dev-hero">
         <div className="dev-hero-copy">
-          <div className="dev-kicker"><span /> @riskos/client · v0.2.0</div>
+          <div className="dev-kicker"><span /> @riskos/client · v0.4.0</div>
           <h2>From address to actionable evidence.</h2>
           <p>
             A standalone TypeScript SDK for Stacks wallets, protocols, treasury tools, and research products.
@@ -210,7 +282,7 @@ export function IntegrationsPage({
           </div>
         </div>
         <div className="dev-stats" aria-label="SDK capabilities">
-          <div><strong>24</strong><span>typed methods</span></div>
+          <div><strong>{sdkMethods.length}</strong><span>typed methods</span></div>
           <div><strong>7</strong><span>workflow domains</span></div>
           <div><strong>15s</strong><span>default timeout</span></div>
           <div><strong>0</strong><span>custodied funds</span></div>
@@ -220,6 +292,7 @@ export function IntegrationsPage({
       <nav className="dev-tabs" aria-label="Developer console sections">
         {([
           ["quickstart", "Quickstart"],
+          ["access", "API access"],
           ["explorer", "API explorer"],
           ["reference", "SDK reference"],
           ["widget", "Widget"],
@@ -286,6 +359,119 @@ export function IntegrationsPage({
             <StatusChip tone="caution">Advisory mainnet</StatusChip>
           </section>
         </div>
+      ) : null}
+
+      {tab === "access" ? (
+        <section className="dev-access-page">
+          <div className="dev-access-intro">
+            <div>
+              <div className="dev-section-label">WALLET-OWNED CREDENTIALS</div>
+              <h2>API access and usage</h2>
+              <p>Create, inspect, and revoke production keys. Secrets are returned once and are never stored in plaintext.</p>
+            </div>
+            {walletConnected ? <StatusChip tone="healthy">Wallet verified</StatusChip> : <StatusChip tone="caution">Wallet required</StatusChip>}
+          </div>
+
+          {!walletConnected ? (
+            <div className="dev-access-gate">
+              <div className="dev-workflow-icon"><Icon name="wallet" size={20} /></div>
+              <h3>Verify the wallet that owns the subscription</h3>
+              <p>A signed ownership challenge protects key creation, usage data, and revocation. RiskOS never asks for a seed phrase.</p>
+              <button className="btn primary" onClick={() => void onConnect()}>Connect and verify wallet</button>
+            </div>
+          ) : accessLoading && !access ? (
+            <div className="dev-access-gate"><p>Loading API access…</p></div>
+          ) : access ? (
+            <>
+              <div className="dev-access-summary">
+                <div><span>Current plan</span><strong>{access.plan.name}</strong></div>
+                <div><span>Monthly capacity</span><strong>{access.plan.apiRequestsMonthly.toLocaleString()}</strong></div>
+                <div><span>Active keys</span><strong>{access.keys.filter((item) => item.key.status === "active").length} / {access.maximumActiveKeys}</strong></div>
+                <div><span>Renewal</span><strong>UTC monthly</strong></div>
+              </div>
+
+              {newSecret ? (
+                <div className="dev-secret-once">
+                  <div>
+                    <div className="dev-section-label">COPY THIS SECRET NOW</div>
+                    <strong>This API key will not be shown again.</strong>
+                  </div>
+                  <code>{newSecret}</code>
+                  <button className="btn primary small" onClick={() => void navigator.clipboard?.writeText(newSecret)}>
+                    <Icon name="copy" size={14} /> Copy key
+                  </button>
+                  <button className="btn secondary small" onClick={() => setNewSecret("")}>I stored it safely</button>
+                </div>
+              ) : null}
+
+              {access.canCreate ? (
+                <div className="dev-key-create">
+                  <div>
+                    <h3>Create an API key</h3>
+                    <p>
+                      Use a name that identifies its environment or service. Your plan allows{" "}
+                      {access.maximumActiveKeys} active {access.maximumActiveKeys === 1 ? "key" : "keys"}.
+                    </p>
+                  </div>
+                  <input
+                    value={newKeyName}
+                    onChange={(event) => setNewKeyName(event.target.value)}
+                    placeholder="e.g. Production backend"
+                    maxLength={100}
+                  />
+                  <button className="btn primary" disabled={creatingKey || !newKeyName.trim()} onClick={() => void createKey()}>
+                    {creatingKey ? "Creating…" : "Create key"}
+                  </button>
+                </div>
+              ) : (
+                <div className="dev-upgrade-access">
+                  <div>
+                    <strong>API key creation is not included in {access.plan.name}.</strong>
+                    <p>API Growth includes 50,000 metered requests, recommendation mode, extended history, SDK use, and embeds.</p>
+                  </div>
+                  <button className="btn primary" onClick={onPlans}>Compare API plans</button>
+                </div>
+              )}
+
+              <div className="dev-key-list">
+                <div className="dev-section-heading">
+                  <div>
+                    <div className="dev-section-label">CREDENTIALS</div>
+                    <h2>{access.keys.length ? "Your API keys" : "No API keys yet"}</h2>
+                  </div>
+                </div>
+                {access.keys.map(({ key, usage }) => {
+                  const percentage = Math.min(100, (usage.requestCount / Math.max(1, usage.monthlyRequestLimit)) * 100);
+                  return (
+                    <article key={key.keyId}>
+                      <div className="dev-key-details">
+                        <div>
+                          <div className="dev-key-name"><strong>{key.name}</strong><AccessBadge access="API key" /></div>
+                          <code>{key.keyPrefix}••••••••••••••••••••</code>
+                        </div>
+                        <span className={`dev-key-state ${key.status}`}>{key.status}</span>
+                      </div>
+                      <div className="dev-key-usage">
+                        <div><span>{usage.requestCount.toLocaleString()} used</span><span>{usage.remaining.toLocaleString()} remaining</span></div>
+                        <div className="dev-usage-track"><i style={{ width: `${percentage}%` }} /></div>
+                      </div>
+                      <div className="dev-key-meta">
+                        <span>Created {new Date(key.createdAt).toLocaleDateString()}</span>
+                        <span>{key.lastUsedAt ? `Last used ${new Date(key.lastUsedAt).toLocaleString()}` : "Never used"}</span>
+                        {key.status === "active" ? (
+                          <button disabled={revokingKeyId === key.keyId} onClick={() => void revokeKey(key.keyId)}>
+                            {revokingKeyId === key.keyId ? "Revoking…" : "Revoke"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+          {accessError ? <div className="dev-access-error">{accessError}</div> : null}
+        </section>
       ) : null}
 
       {tab === "explorer" ? (

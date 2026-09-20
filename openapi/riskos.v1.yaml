@@ -62,6 +62,15 @@ paths:
         "200":
           description: Current evidence-labeled market catalog
         "502": { $ref: "#/components/responses/Problem" }
+  /v1/yield/strategies:
+    get:
+      operationId: getYieldStrategies
+      summary: Discover evidence-derived yield strategies
+      description: Converts the current signed-registry market universe into strategy records with explore and recommendation availability. It does not invent rates, allocate capital, or create executable transactions.
+      responses:
+        "200":
+          description: Current strategies, evidence labels, supported modes, capacity, and exclusion reasons
+        "502": { $ref: "#/components/responses/Problem" }
   /v1/yield/allocations:
     post:
       operationId: createYieldAllocation
@@ -129,11 +138,54 @@ paths:
   /v1/account/plan:
     get:
       operationId: getAccountPlan
-      security: [{ sessionCookie: [] }]
+      security: [{ sessionCookie: [] }, { bearerAuth: [] }]
       summary: Read the wallet-owned plan and entitlement
       responses:
         "200": { description: Effective wallet plan and optional entitlement }
         "401": { $ref: "#/components/responses/Problem" }
+  /v1/account/api-keys:
+    get:
+      operationId: getAccountApiKeys
+      security: [{ sessionCookie: [] }, { bearerAuth: [] }]
+      summary: List API keys owned by the authenticated wallet
+      description: Returns key prefixes, status, monthly usage, and remaining allowance. API key secrets are never returned.
+      responses:
+        "200": { description: Wallet-owned API keys and usage }
+        "401": { $ref: "#/components/responses/Problem" }
+    post:
+      operationId: createAccountApiKey
+      security: [{ sessionCookie: [] }, { bearerAuth: [] }]
+      summary: Create a wallet-owned API key
+      description: Free, Pro, and Treasury wallets may keep one active key; API Growth and Protocol Partner wallets may keep five. The plaintext secret is returned exactly once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "201": { description: One-time API key secret and public metadata }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/account/api-keys/{keyId}/revoke:
+    post:
+      operationId: revokeAccountApiKey
+      security: [{ sessionCookie: [] }, { bearerAuth: [] }]
+      summary: Permanently revoke a wallet-owned API key
+      parameters:
+        - in: path
+          name: keyId
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: API key revoked }
+        "401": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
   /v1/reports/portfolio:
     get:
       operationId: getPortfolioEvidenceReport
@@ -201,7 +253,7 @@ paths:
   /v1/auth/verify:
     post:
       operationId: verifyWalletChallenge
-      description: Verifies the Stacks message signature and issues a short-lived httpOnly session cookie.
+      description: Verifies the Stacks message signature and issues a short-lived httpOnly session cookie plus an in-memory bearer token for approved cross-origin browser clients.
       requestBody:
         required: true
         content:
@@ -221,7 +273,7 @@ paths:
   /v1/auth/session:
     get:
       operationId: getWalletSession
-      security: [{ sessionCookie: [] }]
+      security: [{ sessionCookie: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: Current wallet session }
         "401": { $ref: "#/components/responses/Problem" }

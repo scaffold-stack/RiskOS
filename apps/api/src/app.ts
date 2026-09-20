@@ -73,6 +73,7 @@ import {
   COMMERCIAL_PLANS,
   CommercialService,
   MemoryCommercialStore,
+  apiKeyLimitForPlan,
   hasCommercialFeature,
   type ApiUsage,
   type CommercialFeature,
@@ -156,9 +157,12 @@ const apiKeyCreateSchema = z.object({
   plan: z.enum(["developer", "protocol"]),
   monthlyRequestLimit: z.number().int().min(1).max(10_000_000).optional(),
 });
+const walletApiKeyCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+});
 const entitlementSchema = z.object({
   address: stacksAddressSchema,
-  plan: z.enum(["free", "pro", "treasury", "protocol"]),
+  plan: z.enum(["free", "pro", "treasury", "developer", "protocol"]),
   endsAt: z.string().datetime().nullable().optional(),
   source: z.enum(["manual", "billing"]).default("manual"),
 });
@@ -726,6 +730,55 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
   });
 
+  app.get("/v1/yield/strategies", async (_request, reply) => {
+    try {
+      const markets = await currentYieldMarkets();
+      return {
+        asOf: now().toISOString(),
+        strategies: markets.map((market) => ({
+          id: `yield:${market.id}`,
+          marketId: market.id,
+          protocol: market.protocol,
+          kind: market.kind,
+          assets: market.assets,
+          annualizedRateBps: market.annualizedRateBps,
+          rateLabel: market.rateLabel,
+          evidenceState: market.evidenceState,
+          confidenceScore: market.confidenceScore,
+          modes:
+            market.annualizedRateBps === null
+              ? []
+              : market.eligibleForAllocation
+                ? ["explore", "recommend"]
+                : ["explore"],
+          eligibleForRecommendation: market.eligibleForAllocation,
+          exclusionReason:
+            market.annualizedRateBps === null
+              ? "No usable annualized rate is currently available."
+              : market.eligibleForAllocation
+                ? null
+                : "Current evidence does not satisfy recommendation constraints.",
+          tvlUsd: market.tvlUsd,
+          capacityEvidence: market.capacityEvidence,
+          observedAt: market.observedAt,
+          source: market.source,
+          meaning: market.meaning,
+        })),
+      };
+    } catch (error) {
+      return reply
+        .code(502)
+        .send(
+          problem(
+            502,
+            "YIELD_STRATEGIES_UNAVAILABLE",
+            "Yield strategies unavailable",
+            error instanceof Error ? error.message : "Current yield evidence could not be loaded.",
+          ),
+        );
+    }
+  });
+
   app.post("/v1/yield/allocations", async (request, reply) => {
     const parsed = yieldAllocationSchema.safeParse(request.body);
     if (!parsed.success)
@@ -1050,7 +1103,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         "set-cookie",
         sessionCookie(verified.token, verified.session.expiresAt, process.env.NODE_ENV === "production"),
       );
-      return verified.session;
+      return { ...verified.session, token: verified.token };
     } catch (error) {
       return reply
         .code(401)
@@ -1094,6 +1147,63 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     const session = await sessionFor(request, reply);
     if (!session) return;
     return commercial.walletPlan(session.address);
+  });
+
+  app.get("/v1/account/api-keys", async (request, reply) => {
+    const session = await sessionFor(request, reply);
+    if (!session) return;
+    const { entitlement, plan } = await commercial.walletPlan(session.address);
+    return {
+      entitlement,
+      plan,
+      canCreate: true,
+      maximumActiveKeys: apiKeyLimitForPlan(plan.id),
+      keys: await commercial.walletApiKeys(session.address),
+    };
+  });
+
+  app.post("/v1/account/api-keys", async (request, reply) => {
+    const session = await sessionFor(request, reply);
+    if (!session) return;
+    const parsed = walletApiKeyCreateSchema.safeParse(request.body);
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send(
+          problem(
+            400,
+            "INVALID_API_KEY_REQUEST",
+            "Invalid API key request",
+            parsed.error.issues.map((issue) => issue.message).join(", "),
+          ),
+        );
+    try {
+      return reply.code(201).send(await commercial.createWalletApiKey(session.address, parsed.data.name));
+    } catch (error) {
+      if (error instanceof Error && error.message === "API_KEY_LIMIT_REACHED")
+        return reply
+          .code(409)
+          .send(
+            problem(
+              409,
+              "API_KEY_LIMIT_REACHED",
+              "API key limit reached",
+              "Revoke an active key before creating another one.",
+            ),
+          );
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { keyId: string } }>("/v1/account/api-keys/:keyId/revoke", async (request, reply) => {
+    const session = await sessionFor(request, reply);
+    if (!session) return;
+    const revoked = await commercial.revokeWalletApiKey(session.address, request.params.keyId);
+    if (!revoked)
+      return reply
+        .code(404)
+        .send(problem(404, "API_KEY_NOT_FOUND", "API key not found", "The key is unknown, revoked, or not owned by this wallet."));
+    return { keyId: request.params.keyId, status: "revoked" };
   });
 
   app.post("/v1/auth/logout", async (request, reply) => {

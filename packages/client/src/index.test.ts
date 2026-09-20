@@ -33,6 +33,7 @@ describe("RiskOsClient", () => {
       if (url.includes("/overview")) return json({ address: "SP 123", positions: {}, risks: [], portfolio: {} });
       if (url.includes("/history")) return json({ address: "SP 123", observations: [] });
       if (url.endsWith("/v1/yield/markets")) return json({ asOf: "2026-09-20T00:00:00Z", markets: [] });
+      if (url.endsWith("/v1/yield/strategies")) return json({ asOf: "2026-09-20T00:00:00Z", strategies: [] });
       return json({ code: "NOT_FOUND", title: "Not found" }, 404);
     });
     const client = new RiskOsClient({
@@ -45,6 +46,7 @@ describe("RiskOsClient", () => {
     await expect(client.getOverview("SP 123")).resolves.toMatchObject({ address: "SP 123" });
     await expect(client.getHistory("SP 123", { limit: 30 })).resolves.toMatchObject({ observations: [] });
     await expect(client.getYieldMarkets()).resolves.toMatchObject({ markets: [] });
+    await expect(client.getYieldStrategies()).resolves.toMatchObject({ strategies: [] });
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/SP%20123/overview");
     expect(String(fetchMock.mock.calls[2]?.[0])).toContain("limit=30");
     expect(() => client.getHistory("SP123", { limit: 0 })).toThrow(RangeError);
@@ -72,6 +74,38 @@ describe("RiskOsClient", () => {
       fetch: fetchMock as unknown as typeof fetch,
     });
     await client.createYieldAllocation({ capitalUsd: "1000", days: 90 });
+  });
+
+  it("manages wallet-owned API keys with a wallet bearer session", async () => {
+    const calls: Array<{ url: string; method: string; body: unknown }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer wallet-session-token");
+      calls.push({
+        url,
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      if (url.endsWith("/v1/account/api-keys") && init?.method === "POST")
+        return json({ apiKey: "rko_secret", key: { keyId: "key_1" } }, 201);
+      if (url.endsWith("/revoke")) return json({ keyId: "key/1", status: "revoked" });
+      return json({ canCreate: true, maximumActiveKeys: 5, keys: [] });
+    });
+    const client = new RiskOsClient({
+      baseUrl: "https://api.example.com",
+      headers: { authorization: "Bearer wallet-session-token" },
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.getAccountApiKeys();
+    await client.createAccountApiKey("Production backend");
+    await client.revokeAccountApiKey("key/1");
+    expect(calls).toEqual([
+      { url: "https://api.example.com/v1/account/api-keys", method: "GET", body: null },
+      { url: "https://api.example.com/v1/account/api-keys", method: "POST", body: { name: "Production backend" } },
+      { url: "https://api.example.com/v1/account/api-keys/key%2F1/revoke", method: "POST", body: {} },
+    ]);
+    expect(() => client.createAccountApiKey(" ")).toThrow(/name/);
   });
 
   it("preserves structured problem details and request metadata", async () => {

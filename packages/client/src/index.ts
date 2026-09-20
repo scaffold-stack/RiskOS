@@ -1,5 +1,7 @@
 import type {
+  AccountApiKeysResponse,
   AccountPlanResponse,
+  CreatedApiKeyResponse,
   AlertOccurrence,
   AlertRule,
   DeveloperUsageResponse,
@@ -19,9 +21,10 @@ import type {
   WalletTransactionRequest,
   YieldAllocationPlan,
   YieldMarket,
+  YieldStrategy,
 } from "./types.js";
 
-export const RISKOS_SDK_VERSION = "0.2.0";
+export const RISKOS_SDK_VERSION = "0.4.0";
 
 export interface RiskOsClientOptions {
   baseUrl: string;
@@ -103,6 +106,22 @@ export class RiskOsClient {
     return this.get<AccountPlanResponse>("/v1/account/plan", options);
   }
 
+  getAccountApiKeys(options?: RiskOsRequestOptions) {
+    return this.get<AccountApiKeysResponse>("/v1/account/api-keys", options);
+  }
+
+  createAccountApiKey(name: string, options?: RiskOsRequestOptions) {
+    return this.post<CreatedApiKeyResponse>("/v1/account/api-keys", { name: requiredString(name, "name") }, options);
+  }
+
+  revokeAccountApiKey(keyId: string, options?: RiskOsRequestOptions) {
+    return this.post<{ keyId: string; status: "revoked" }>(
+      `/v1/account/api-keys/${encodeURIComponent(requiredString(keyId, "keyId"))}/revoke`,
+      {},
+      options,
+    );
+  }
+
   getPositions(address: string, options?: RiskOsRequestOptions) {
     return this.get<PositionEnvelope>(addressPath(address, "positions"), options);
   }
@@ -143,6 +162,10 @@ export class RiskOsClient {
 
   getYieldMarkets(options?: RiskOsRequestOptions) {
     return this.get<{ asOf: string; markets: YieldMarket[] }>("/v1/yield/markets", options);
+  }
+
+  getYieldStrategies(options?: RiskOsRequestOptions) {
+    return this.get<{ asOf: string; strategies: YieldStrategy[] }>("/v1/yield/strategies", options);
   }
 
   createYieldAllocation(

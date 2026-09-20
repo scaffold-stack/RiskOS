@@ -36,8 +36,8 @@ export const COMMERCIAL_PLANS: Readonly<Record<CommercialPlanId, CommercialPlan>
     apiRequestsMonthly: 1_000,
     maxAlertRules: 1,
     maxWallets: 1,
-    features: ["public-read", "yield-explore"],
-    highlights: ["Current positions and risk", "Yield opportunity exploration", "One in-app alert rule"],
+    features: ["public-read", "yield-explore", "api-access"],
+    highlights: ["Current positions and risk", "Yield opportunity exploration", "One API key with 1,000 monthly requests"],
   },
   pro: {
     id: "pro",
@@ -47,7 +47,7 @@ export const COMMERCIAL_PLANS: Readonly<Record<CommercialPlanId, CommercialPlan>
     apiRequestsMonthly: 10_000,
     maxAlertRules: 10,
     maxWallets: 1,
-    features: ["public-read", "yield-explore", "yield-recommend", "history-extended", "alerts-unlimited", "reports"],
+    features: ["public-read", "yield-explore", "yield-recommend", "history-extended", "alerts-unlimited", "reports", "api-access"],
     highlights: ["Up to ten alert policies", "Extended canonical history", "Evidence report and recommendation mode"],
   },
   treasury: {
@@ -58,7 +58,7 @@ export const COMMERCIAL_PLANS: Readonly<Record<CommercialPlanId, CommercialPlan>
     apiRequestsMonthly: 50_000,
     maxAlertRules: 100,
     maxWallets: 1,
-    features: ["public-read", "yield-explore", "yield-recommend", "history-extended", "alerts-unlimited", "reports", "priority-support"],
+    features: ["public-read", "yield-explore", "yield-recommend", "history-extended", "alerts-unlimited", "reports", "api-access", "priority-support"],
     highlights: ["Up to one hundred alert policies", "Extended history and evidence reports", "Priority treasury support"],
   },
   developer: {
@@ -89,8 +89,9 @@ export interface ApiKeyRecord {
   keyId: string;
   keyPrefix: string;
   secretHash: string;
+  ownerAddress: string | null;
   name: string;
-  plan: "developer" | "protocol";
+  plan: CommercialPlanId;
   status: "active" | "revoked";
   monthlyRequestLimit: number;
   createdAt: string;
@@ -101,7 +102,7 @@ export interface ApiKeyRecord {
 export interface CommercialEntitlement {
   subjectType: "wallet";
   subjectId: string;
-  plan: "free" | "pro" | "treasury" | "protocol";
+  plan: "free" | "pro" | "treasury" | "developer" | "protocol";
   status: "active" | "expired" | "revoked";
   source: "manual" | "billing";
   startsAt: string;
@@ -122,7 +123,8 @@ export type PublicApiKey = Omit<ApiKeyRecord, "secretHash">;
 export interface CommercialStore {
   putApiKey(value: ApiKeyRecord): Promise<void>;
   apiKeyByHash(secretHash: string): Promise<ApiKeyRecord | null>;
-  revokeApiKey(keyId: string, at: Date): Promise<boolean>;
+  apiKeysForOwner(ownerAddress: string): Promise<ApiKeyRecord[]>;
+  revokeApiKey(keyId: string, at: Date, ownerAddress?: string): Promise<boolean>;
   consumeApiRequest(keyId: string, periodStart: string, at: Date): Promise<number>;
   apiUsage(keyId: string, periodStart: string): Promise<number>;
   putEntitlement(value: CommercialEntitlement): Promise<void>;
@@ -142,9 +144,16 @@ export class MemoryCommercialStore implements CommercialStore {
     return [...this.keys.values()].find((key) => key.secretHash === secretHash) ?? null;
   }
 
-  async revokeApiKey(keyId: string, at: Date) {
+  async apiKeysForOwner(ownerAddress: string) {
+    return [...this.keys.values()]
+      .filter((key) => key.ownerAddress === ownerAddress)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  async revokeApiKey(keyId: string, at: Date, ownerAddress?: string) {
     const existing = this.keys.get(keyId);
-    if (!existing || existing.status === "revoked") return false;
+    if (!existing || existing.status === "revoked" || (ownerAddress !== undefined && existing.ownerAddress !== ownerAddress))
+      return false;
     this.keys.set(keyId, { ...existing, status: "revoked", revokedAt: at.toISOString() });
     return true;
   }
@@ -182,6 +191,7 @@ export class PostgresCommercialStore implements CommercialStore {
       key_id: value.keyId,
       key_prefix: value.keyPrefix,
       secret_hash: value.secretHash,
+      owner_address: value.ownerAddress,
       name: value.name,
       plan: value.plan,
       status: value.status,
@@ -197,11 +207,21 @@ export class PostgresCommercialStore implements CommercialStore {
     return rows[0] ? apiKeyRow(rows[0]) : null;
   }
 
-  async revokeApiKey(keyId: string, at: Date) {
+  async apiKeysForOwner(ownerAddress: string) {
+    const rows = await this.sql`
+      SELECT * FROM commercial_api_keys
+      WHERE owner_address = ${ownerAddress}
+      ORDER BY created_at DESC
+    `;
+    return rows.map(apiKeyRow);
+  }
+
+  async revokeApiKey(keyId: string, at: Date, ownerAddress?: string) {
     const rows = await this.sql`
       UPDATE commercial_api_keys
       SET status = 'revoked', revoked_at = ${at}
       WHERE key_id = ${keyId} AND status = 'active'
+        ${ownerAddress === undefined ? this.sql`` : this.sql`AND owner_address = ${ownerAddress}`}
       RETURNING key_id
     `;
     return rows.length === 1;
@@ -272,7 +292,12 @@ export class CommercialService {
     return Object.values(COMMERCIAL_PLANS);
   }
 
-  async createApiKey(input: { name: string; plan: "developer" | "protocol"; monthlyRequestLimit?: number }) {
+  async createApiKey(input: {
+    name: string;
+    plan: CommercialPlanId;
+    monthlyRequestLimit?: number;
+    ownerAddress?: string | null;
+  }) {
     const name = input.name.trim();
     if (!name || name.length > 100) throw new Error("API key name must be between 1 and 100 characters");
     const plan = COMMERCIAL_PLANS[input.plan];
@@ -285,6 +310,7 @@ export class CommercialService {
       keyId: `key_${randomUUID()}`,
       keyPrefix: rawKey.slice(0, 12),
       secretHash: commercialSecretHash(rawKey),
+      ownerAddress: input.ownerAddress ?? null,
       name,
       plan: input.plan,
       status: "active",
@@ -318,9 +344,31 @@ export class CommercialService {
     return this.store.revokeApiKey(keyId, this.now());
   }
 
+  async walletApiKeys(address: string) {
+    const keys = await this.store.apiKeysForOwner(address);
+    return Promise.all(keys.map(async (key) => ({ key: publicApiKey(key), usage: await this.usageForKey(key) })));
+  }
+
+  async createWalletApiKey(address: string, name: string) {
+    const { plan } = await this.walletPlan(address);
+    const keys = await this.store.apiKeysForOwner(address);
+    if (keys.filter((key) => key.status === "active").length >= apiKeyLimitForPlan(plan.id))
+      throw new Error("API_KEY_LIMIT_REACHED");
+    return this.createApiKey({
+      name,
+      plan: plan.id,
+      monthlyRequestLimit: plan.apiRequestsMonthly,
+      ownerAddress: address,
+    });
+  }
+
+  async revokeWalletApiKey(address: string, keyId: string): Promise<boolean> {
+    return this.store.revokeApiKey(keyId, this.now(), address);
+  }
+
   async grantWalletPlan(input: {
     address: string;
-    plan: "free" | "pro" | "treasury" | "protocol";
+    plan: "free" | "pro" | "treasury" | "developer" | "protocol";
     endsAt?: string | null;
     source?: "manual" | "billing";
   }): Promise<CommercialEntitlement> {
@@ -361,10 +409,15 @@ export function hasCommercialFeature(plan: CommercialPlan, feature: CommercialFe
   return plan.features.includes(feature);
 }
 
+export function apiKeyLimitForPlan(plan: CommercialPlanId): number {
+  return plan === "developer" || plan === "protocol" ? 5 : 1;
+}
+
 function publicApiKey(key: ApiKeyRecord): PublicApiKey {
   return {
     keyId: key.keyId,
     keyPrefix: key.keyPrefix,
+    ownerAddress: key.ownerAddress,
     name: key.name,
     plan: key.plan,
     status: key.status,
@@ -394,6 +447,7 @@ function apiKeyRow(row: postgres.Row): ApiKeyRecord {
     keyId: String(row.key_id),
     keyPrefix: String(row.key_prefix),
     secretHash: String(row.secret_hash),
+    ownerAddress: row.owner_address ? String(row.owner_address) : null,
     name: String(row.name),
     plan: String(row.plan) as ApiKeyRecord["plan"],
     status: String(row.status) as ApiKeyRecord["status"],

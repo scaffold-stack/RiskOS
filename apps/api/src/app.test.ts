@@ -32,6 +32,28 @@ describe("RiskOS API integration", () => {
     return String(verifyResponse.headers["set-cookie"]);
   }
 
+  async function authenticateBearer(target: FastifyInstance, address = DEMO_ADDRESS) {
+    const challengeResponse = await target.inject({
+      method: "POST",
+      url: "/v1/auth/challenge",
+      payload: { address },
+    });
+    const challenge = challengeResponse.json();
+    const verifyResponse = await target.inject({
+      method: "POST",
+      url: "/v1/auth/verify",
+      payload: {
+        challengeId: challenge.challengeId,
+        address,
+        publicKey: "fixture",
+        signature: `fixture:${challenge.challengeId}`,
+      },
+    });
+    expect(verifyResponse.statusCode).toBe(200);
+    expect(verifyResponse.json().token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    return String(verifyResponse.json().token);
+  }
+
   it("runs the address-to-risk-to-protection workflow", async () => {
     app = await buildApp({ dataMode: "fixture", now: () => new Date("2026-09-03T15:00:00Z") });
     const overviewResponse = await app.inject({
@@ -128,6 +150,19 @@ describe("RiskOS API integration", () => {
         expect.objectContaining({ protocol: "bitflow", eligibleForAllocation: true }),
       ]),
     );
+    const strategies = await app.inject({ method: "GET", url: "/v1/yield/strategies" });
+    expect(strategies.statusCode).toBe(200);
+    expect(strategies.json()).toMatchObject({
+      asOf: "2026-09-13T12:00:00.000Z",
+      strategies: expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringMatching(/^yield:/),
+          protocol: "zest",
+          modes: ["explore", "recommend"],
+          eligibleForRecommendation: true,
+        }),
+      ]),
+    });
 
     const plan = await app.inject({
       method: "POST",
@@ -428,6 +463,116 @@ describe("RiskOS API integration", () => {
     expect(exhausted.json()).toMatchObject({ code: "API_QUOTA_EXCEEDED" });
     expect(Number(exhausted.headers["retry-after"])).toBeGreaterThan(0);
     expect(exhausted.headers["x-ratelimit-reset"]).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("lets an entitled wallet create, list, use, and revoke its own API keys", async () => {
+    const operationsBearerToken = "operations-token-that-is-at-least-32-characters";
+    app = await buildApp({
+      dataMode: "fixture",
+      operationsBearerToken,
+      now: () => new Date("2026-09-20T12:00:00Z"),
+    });
+    const sessionToken = await authenticateBearer(app);
+    const authorization = `Bearer ${sessionToken}`;
+
+    const freeAccess = await app.inject({
+      method: "GET",
+      url: "/v1/account/api-keys",
+      headers: { authorization },
+    });
+    expect(freeAccess.statusCode).toBe(200);
+    expect(freeAccess.json()).toMatchObject({ canCreate: true, maximumActiveKeys: 1, keys: [] });
+
+    const freeKey = await app.inject({
+      method: "POST",
+      url: "/v1/account/api-keys",
+      headers: { authorization },
+      payload: { name: "Free development key" },
+    });
+    expect(freeKey.statusCode).toBe(201);
+    expect(freeKey.json()).toMatchObject({
+      key: { plan: "free", monthlyRequestLimit: 1_000 },
+    });
+    const freeUsage = await app.inject({
+      method: "GET",
+      url: "/v1/developer/usage",
+      headers: { "x-api-key": String(freeKey.json().apiKey) },
+    });
+    expect(freeUsage.json().usage).toMatchObject({ requestCount: 1, remaining: 999 });
+
+    const limited = await app.inject({
+      method: "POST",
+      url: "/v1/account/api-keys",
+      headers: { authorization },
+      payload: { name: "Second free key" },
+    });
+    expect(limited.statusCode).toBe(409);
+    expect(limited.json()).toMatchObject({ code: "API_KEY_LIMIT_REACHED" });
+
+    const revokeFree = await app.inject({
+      method: "POST",
+      url: `/v1/account/api-keys/${freeKey.json().key.keyId}/revoke`,
+      headers: { authorization },
+    });
+    expect(revokeFree.statusCode).toBe(200);
+
+    const entitlement = await app.inject({
+      method: "POST",
+      url: "/v1/operations/entitlements",
+      headers: { authorization: `Bearer ${operationsBearerToken}` },
+      payload: { address: DEMO_ADDRESS, plan: "developer" },
+    });
+    expect(entitlement.statusCode).toBe(201);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/account/api-keys",
+      headers: { authorization },
+      payload: { name: "Production backend" },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      apiKey: expect.stringMatching(/^rko_/),
+      key: { ownerAddress: DEMO_ADDRESS, name: "Production backend", plan: "developer" },
+    });
+
+    const apiKey = String(created.json().apiKey);
+    const usage = await app.inject({
+      method: "GET",
+      url: "/v1/developer/usage",
+      headers: { "x-api-key": apiKey },
+    });
+    expect(usage.statusCode).toBe(200);
+    expect(usage.json().usage).toMatchObject({ requestCount: 1, remaining: 49_999 });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/v1/account/api-keys",
+      headers: { authorization },
+    });
+    expect(listed.json()).toMatchObject({
+      canCreate: true,
+      maximumActiveKeys: 5,
+      keys: expect.arrayContaining([
+        expect.objectContaining({
+          key: expect.objectContaining({ keyId: created.json().key.keyId }),
+          usage: expect.objectContaining({ requestCount: 1 }),
+        }),
+      ]),
+    });
+
+    const revoked = await app.inject({
+      method: "POST",
+      url: `/v1/account/api-keys/${created.json().key.keyId}/revoke`,
+      headers: { authorization },
+    });
+    expect(revoked.statusCode).toBe(200);
+    const rejected = await app.inject({
+      method: "GET",
+      url: "/v1/developer/usage",
+      headers: { "x-api-key": apiKey },
+    });
+    expect(rejected.statusCode).toBe(401);
   });
 
   it("bounds anonymous expensive reads without rate-limiting health checks", async () => {

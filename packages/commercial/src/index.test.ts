@@ -48,6 +48,31 @@ describe("commercial foundation", () => {
     await expect(service.authenticateAndConsume(created.apiKey)).resolves.toEqual({ state: "invalid" });
   });
 
+  it("creates, lists, meters, and revokes wallet-owned API keys", async () => {
+    const service = new CommercialService(new MemoryCommercialStore(), () => new Date("2026-09-20T12:00:00Z"));
+    await service.grantWalletPlan({ address: "SP123", plan: "developer" });
+    const created = await service.createWalletApiKey("SP123", "Production backend");
+    expect(created.key).toMatchObject({
+      ownerAddress: "SP123",
+      name: "Production backend",
+      plan: "developer",
+      monthlyRequestLimit: 50_000,
+    });
+    expect(await service.walletApiKeys("SP999")).toEqual([]);
+    await expect(service.walletApiKeys("SP123")).resolves.toMatchObject([
+      { key: { keyId: created.key.keyId }, usage: { requestCount: 0, remaining: 50_000 } },
+    ]);
+    await expect(service.revokeWalletApiKey("SP999", created.key.keyId)).resolves.toBe(false);
+    await expect(service.revokeWalletApiKey("SP123", created.key.keyId)).resolves.toBe(true);
+  });
+
+  it("allows one 1,000-request key on the free plan", async () => {
+    const service = new CommercialService(new MemoryCommercialStore(), () => new Date("2026-09-20T12:00:00Z"));
+    const created = await service.createWalletApiKey("SP123", "Free key");
+    expect(created.key).toMatchObject({ plan: "free", monthlyRequestLimit: 1_000 });
+    await expect(service.createWalletApiKey("SP123", "Second free key")).rejects.toThrow("API_KEY_LIMIT_REACHED");
+  });
+
   it("resolves expiring wallet entitlements and plan capabilities", async () => {
     let now = new Date("2026-09-20T12:00:00Z");
     const service = new CommercialService(new MemoryCommercialStore(), () => now);

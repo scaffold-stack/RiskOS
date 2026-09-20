@@ -9,12 +9,33 @@ import type {
   WalletSessionView,
   WalletTransactionRequest,
 } from "../../../packages/domain/src/index.js";
+import {
+  clearWalletSession,
+  readWalletSessionToken,
+  writeWalletSession,
+} from "./lib/walletSessionStorage.js";
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
   (typeof window === "undefined"
     ? "http://127.0.0.1:3001"
     : `${window.location.protocol}//${window.location.hostname}:3001`);
+const walletSessionStorage = browserSessionStorage();
+let walletSessionToken: string | null = readWalletSessionToken(walletSessionStorage);
+
+function browserSessionStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function forgetWalletSession() {
+  walletSessionToken = null;
+  clearWalletSession(walletSessionStorage);
+}
 
 export interface SbtcOperationView {
   operationKey: string;
@@ -152,14 +173,50 @@ export interface PlansResponse {
   executionFeesEnabled: false;
 }
 
+export interface AccountApiKey {
+  keyId: string;
+  keyPrefix: string;
+  ownerAddress: string | null;
+  name: string;
+  plan: CommercialPlanView["id"];
+  status: "active" | "revoked";
+  monthlyRequestLimit: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface AccountApiKeysResponse {
+  plan: CommercialPlanView;
+  entitlement: { endsAt: string | null } | null;
+  canCreate: boolean;
+  maximumActiveKeys: number;
+  keys: Array<{
+    key: AccountApiKey;
+    usage: {
+      periodStart: string;
+      requestCount: number;
+      monthlyRequestLimit: number;
+      remaining: number;
+    };
+  }>;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: { ...(init?.body ? { "content-type": "application/json" } : {}), ...init?.headers },
+    headers: {
+      ...(init?.body ? { "content-type": "application/json" } : {}),
+      ...(walletSessionToken ? { authorization: `Bearer ${walletSessionToken}` } : {}),
+      ...init?.headers,
+    },
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.detail ?? payload.title ?? "Request failed");
+  if (!response.ok) {
+    if (response.status === 401 && payload.code === "WALLET_SESSION_REQUIRED") forgetWalletSession();
+    throw new Error(payload.detail ?? payload.title ?? "Request failed");
+  }
   return payload as T;
 }
 
@@ -176,15 +233,30 @@ export function verifyWalletChallenge(input: {
   publicKey: string;
   signature: string;
 }) {
-  return request<WalletSessionView>("/v1/auth/verify", { method: "POST", body: JSON.stringify(input) });
+  return request<WalletSessionView & { token: string }>("/v1/auth/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).then((session) => {
+    walletSessionToken = session.token;
+    writeWalletSession(walletSessionStorage, { token: session.token, expiresAt: session.expiresAt });
+    return session;
+  });
 }
 
 export function getWalletSession() {
   return request<WalletSessionView>("/v1/auth/session");
 }
 export async function logoutWalletSession() {
-  const response = await fetch(`${API_URL}/v1/auth/logout`, { method: "POST", credentials: "include" });
-  if (!response.ok) throw new Error("Unable to close the wallet session");
+  try {
+    const response = await fetch(`${API_URL}/v1/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: walletSessionToken ? { authorization: `Bearer ${walletSessionToken}` } : {},
+    });
+    if (!response.ok) throw new Error("Unable to close the wallet session");
+  } finally {
+    forgetWalletSession();
+  }
 }
 
 export function getHealth() {
@@ -205,6 +277,24 @@ export function getPlans() {
 
 export function getAccountPlan() {
   return request<{ plan: CommercialPlanView; entitlement: { endsAt: string | null } | null }>("/v1/account/plan");
+}
+
+export function getAccountApiKeys() {
+  return request<AccountApiKeysResponse>("/v1/account/api-keys");
+}
+
+export function createAccountApiKey(name: string) {
+  return request<{ apiKey: string; key: AccountApiKey }>("/v1/account/api-keys", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function revokeAccountApiKey(keyId: string) {
+  return request<{ keyId: string; status: "revoked" }>(
+    `/v1/account/api-keys/${encodeURIComponent(keyId)}/revoke`,
+    { method: "POST" },
+  );
 }
 
 export function getPortfolioEvidenceReport() {

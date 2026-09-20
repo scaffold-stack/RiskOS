@@ -259,6 +259,7 @@ export interface WalletChallenge {
 export interface WalletSession {
   address: string;
   expiresAt: string;
+  token?: string;
 }
 
 export interface TransactionIntent {
@@ -327,6 +328,26 @@ export interface YieldMarket {
   meaning: string;
   eligibleForAllocation: boolean;
   allocationExclusionReason?: string | null;
+}
+
+export interface YieldStrategy {
+  id: string;
+  marketId: string;
+  protocol: string;
+  kind: YieldMarket["kind"];
+  assets: string;
+  annualizedRateBps: number | null;
+  rateLabel: YieldMarket["rateLabel"];
+  evidenceState: YieldMarket["evidenceState"];
+  confidenceScore: number;
+  modes: Array<"explore" | "recommend">;
+  eligibleForRecommendation: boolean;
+  exclusionReason: string | null;
+  tvlUsd: string | null;
+  capacityEvidence: YieldMarket["capacityEvidence"];
+  observedAt: string;
+  source: string;
+  meaning: string;
 }
 
 export interface YieldAllocationPlan {
@@ -472,25 +493,28 @@ export interface ApiUsage {
 }
 
 export interface DeveloperUsageResponse {
-  key: {
-    keyId: string;
-    keyPrefix: string;
-    name: string;
-    plan: "developer" | "protocol";
-    status: "active" | "revoked";
-    monthlyRequestLimit: number;
-    createdAt: string;
-    lastUsedAt: string | null;
-    revokedAt: string | null;
-  };
+  key: PublicApiKey;
   usage: ApiUsage;
+}
+
+export interface PublicApiKey {
+  keyId: string;
+  keyPrefix: string;
+  ownerAddress: string | null;
+  name: string;
+  plan: CommercialPlanId;
+  status: "active" | "revoked";
+  monthlyRequestLimit: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
 }
 
 export interface AccountPlanResponse {
   entitlement: {
     subjectType: "wallet";
     subjectId: string;
-    plan: "free" | "pro" | "treasury" | "protocol";
+    plan: "free" | "pro" | "treasury" | "developer" | "protocol";
     status: "active" | "expired" | "revoked";
     source: "manual" | "billing";
     startsAt: string;
@@ -498,6 +522,17 @@ export interface AccountPlanResponse {
     updatedAt: string;
   } | null;
   plan: CommercialPlan;
+}
+
+export interface AccountApiKeysResponse extends AccountPlanResponse {
+  canCreate: boolean;
+  maximumActiveKeys: number;
+  keys: Array<{ key: PublicApiKey; usage: ApiUsage }>;
+}
+
+export interface CreatedApiKeyResponse {
+  apiKey: string;
+  key: PublicApiKey;
 }
 
 export interface PortfolioEvidenceReport {

@@ -4,7 +4,7 @@ RiskOSfolio monetizes persistent monitoring, deeper evidence, supported integrat
 
 ## Enforced plans
 
-- **Free — $0:** public inspection, explore mode, 30 history observations, and one alert rule.
+- **Free — $0:** public inspection, explore mode, 30 history observations, one alert rule, and one API key with 1,000 monthly requests.
 - **Pro — $29/month:** recommendation mode, extended history, up to ten alert rules, and owner-authenticated evidence reports.
 - **Treasury — $299/month:** up to one hundred alert rules, extended history, evidence reports, and priority support during the pilot.
 - **API Growth — $399/month:** 50,000 metered requests, an API key, extended history, and recommendation mode.
@@ -15,6 +15,9 @@ The plan catalog is served by `GET /v1/plans`; the web pricing page reads it rat
 ## Current launch boundary
 
 - API keys are random 256-bit secrets. Only SHA-256 hashes are stored; the raw key is returned once.
+- Entitled wallets can create, list, meter, and revoke their own keys from the
+  Developer Console. Free, Pro, and Treasury wallets may keep one active key;
+  API Growth and Protocol Partner wallets may keep five.
 - API usage is counted atomically per UTC calendar month in Postgres.
 - Revoked, unknown, and exhausted keys fail closed.
 - Anonymous address, yield, action-preview, and challenge routes are limited per
@@ -22,7 +25,10 @@ The plan catalog is served by `GET /v1/plans`; the web pricing page reads it rat
   Cloudflare/WAF limit in front when scaling to multiple API instances.
 - `recommend` yield mode, extended history beyond 30 observations, and additional alert rules are entitlement-gated.
 - Wallet plans are stored independently of the payment provider. This keeps Stripe, invoice, or USDC settlement events outside risk calculations.
-- Provisioning is manual until a reviewed billing webhook is deployed. The product and API explicitly report `billingState: manual-provisioning`.
+- Subscription provisioning is manual until a reviewed billing webhook is
+  deployed. After an API Growth or Protocol entitlement is granted, credential
+  management is self-service. The product and API explicitly report
+  `billingState: manual-provisioning`.
 
 ## Provision an API customer
 

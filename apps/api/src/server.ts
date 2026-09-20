@@ -54,8 +54,14 @@ if (config.DATA_MODE === "live" && config.REGISTRY_CANDIDATE_PATH && registryMod
 const app = await buildApp({
   dataMode: config.DATA_MODE,
   stacksApiUrl: config.STACKS_API_URL,
+  ...(config.STACKS_REFERENCE_API_URL ? {
+    stacksReferenceApiUrl: config.STACKS_REFERENCE_API_URL,
+    ...(config.STACKS_REFERENCE_API_KEY ? { stacksReferenceApiKey: config.STACKS_REFERENCE_API_KEY } : {}),
+  } : {}),
   bitflowAppApiUrl: config.BITFLOW_APP_API_URL,
   bitflowQuotesApiUrl: config.BITFLOW_QUOTES_API_URL,
+  hermeticaApiUrl: config.HERMETICA_API_URL,
+  defiLlamaYieldsApiUrl: config.DEFILLAMA_YIELDS_API_URL,
   sbtcEmilyUrl: config.SBTC_EMILY_URL,
   bitcoinEsploraUrl: config.BITCOIN_ESPLORA_URL,
   logger: true,
@@ -68,8 +74,11 @@ const app = await buildApp({
   ...(config.PYTH_HERMES_TOKEN ? {
     pythHermesToken: config.PYTH_HERMES_TOKEN,
     pythHermesUrl: config.PYTH_HERMES_URL,
-    priceMaximumDivergenceBps: config.PRICE_MAX_DIVERGENCE_BPS,
   } : {}),
+  priceMaximumDivergenceBps: config.PRICE_MAX_DIVERGENCE_BPS,
+  coinGeckoApiUrl: config.COINGECKO_API_URL,
+  coinbaseExchangeApiUrl: config.COINBASE_EXCHANGE_API_URL,
+  ...(config.COINGECKO_DEMO_API_KEY ? { coinGeckoDemoApiKey: config.COINGECKO_DEMO_API_KEY } : {}),
   ...(registryStore ? { registryStore } : {}),
   ...(sql ? { productStore: new PostgresProductStore(sql) } : {}),
   authAudience: config.WEB_ORIGIN?.split(",")[0] ?? "http://localhost:5173",

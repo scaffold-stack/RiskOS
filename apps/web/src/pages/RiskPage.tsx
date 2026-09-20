@@ -5,11 +5,16 @@ import type {
   PositionEnvelope,
   RiskFinding,
 } from "../../../../packages/domain/src/index.js";
+import { useEffect, useState } from "react";
 import { AssetIcon } from "../components/AssetIcon.js";
 import { Icon } from "../components/Icons.js";
 import { ProtocolIcon } from "../components/ProtocolIcon.js";
 import { EmptyState, StatusChip } from "../components/Ui.js";
 import { formatUsd, humanAmount, severityTone } from "../lib/portfolio.js";
+import { operationalWarnings } from "../lib/warnings.js";
+
+type RiskViewMode = "easy" | "advanced";
+const RISK_VIEW_MODE_KEY = "riskos:risk-view-mode";
 
 export function RiskPage({
   risks,
@@ -24,7 +29,20 @@ export function RiskPage({
   onInspect: () => void;
   onProtect: () => void;
 }) {
-  if (!summary || risks.length === 0) return <RiskEmpty summary={summary} onInspect={onInspect} />;
+  const [viewMode, setViewMode] = useState<RiskViewMode>(() => {
+    if (typeof window === "undefined") return "easy";
+    return window.localStorage.getItem(RISK_VIEW_MODE_KEY) === "advanced" ? "advanced" : "easy";
+  });
+  useEffect(() => {
+    window.localStorage.setItem(RISK_VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
+  const advanced = viewMode === "advanced";
+
+  if (!summary || risks.length === 0) {
+    return (
+      <RiskEmpty summary={summary} onInspect={onInspect} viewMode={viewMode} onViewModeChange={setViewMode} />
+    );
+  }
   const score = summary.risk.score;
   const categories = [...new Set(risks.map((risk) => risk.category))];
   const lending =
@@ -39,74 +57,115 @@ export function RiskPage({
     ? risks.find((risk) => risk.positionId === liquidity.id && risk.category === "liquidity")
     : undefined;
   const classification = riskName(summary.risk.classification);
+  const bannerTone = risks.length === 0 ? "healthy" : severityTone(highestSeverity(risks));
 
   return (
     <main className="risk-dashboard">
-      <header className="risk-heading">
-        <h1>Risk monitor</h1>
-        <p>What can go wrong, how much capital is affected, and what happens if you do nothing?</p>
+      <header className="risk-heading risk-heading-with-mode">
+        <div>
+          <h1>Risk monitor</h1>
+          <p>What can go wrong, how much capital is affected, and what happens if you do nothing?</p>
+        </div>
+        <RiskModeToggle value={viewMode} onChange={setViewMode} />
       </header>
-      <section className={`risk-banner ${severityTone(highestSeverity(risks))}`}>
+      <section className="risk-purpose-strip">
+        <Icon name="shield" size={18} />
+        <p>
+          See where your Bitcoin capital is deployed, understand what it earns and what can go wrong, then
+          prepare the safest action without giving up custody.
+        </p>
+      </section>
+      <section className={`risk-banner ${bannerTone}`}>
         <span className="risk-banner-mark">{score < 30 ? "✓" : "!"}</span>
         <div>
           <strong>
             {classification} · {score} / 100
           </strong>
-          <p>{summary.risk.classificationMeaning}</p>
+          <p>
+            {risks.length === 0
+              ? "No current findings. BTC stress below still shows how valued Bitcoin exposure would move if price falls."
+              : advanced
+                ? summary.risk.classificationMeaning
+                : riskScoreMeaning(score)}
+          </p>
         </div>
         <p>
-          This score reflects stress sensitivity across your positions, not an immediate liquidation event.
+          {advanced
+            ? "This score reflects stress sensitivity across your positions, not an immediate liquidation event."
+            : "A high score means more exposure to the issues found below. It does not mean liquidation is happening now."}
         </p>
         <Icon name="info" size={15} />
       </section>
       <section className="risk-metric-grid">
         <RiskMetric
-          label="Composite risk"
+          label={advanced ? "Composite risk" : "Overall risk"}
           value={`${score} / 100`}
-          detail={`${classification} — monitor the evidence`}
+          detail={advanced ? `${classification} — monitor the evidence` : riskScoreMeaning(score)}
           tone={score >= 60 ? "bad" : score >= 30 ? "caution" : "good"}
         />
         <RiskMetric
-          label="Findings"
+          label={advanced ? "Findings" : "Items to review"}
           value={String(risks.length)}
-          detail="Deterministic rules with evidence"
+          detail={advanced ? "Deterministic rules with evidence" : "Backed by current position evidence"}
         />
         <RiskMetric
-          label="Risk categories"
+          label={advanced ? "Risk categories" : "Types of risk"}
           value={String(categories.length)}
-          detail={categories.map(titleCase).join(", ")}
+          detail={
+            categories.length
+              ? categories.map(advanced ? titleCase : easyCategoryLabel).join(", ")
+              : "None open"
+          }
         />
         <RiskMetric
-          label="Capital at risk"
+          label={advanced ? "Capital at risk" : "Value in urgent findings"}
           value={formatUsd(summary.risk.capitalAtRiskUsd)}
-          detail="Positions with high/critical findings"
+          detail={advanced ? "Positions with high/critical findings" : "Shown only when reliably valued"}
         />
         <RiskMetric
-          label="Model confidence"
+          label={advanced ? "Model confidence" : "Evidence confidence"}
           value={`${Math.round(summary.risk.confidence * 100)}%`}
-          detail="Across all models"
+          detail={advanced ? "Across all models" : "How complete and fresh the supporting data is"}
           tone="good"
         />
       </section>
       <section className="risk-top-grid">
-        <RiskComposition score={score} risks={risks} expected={summary.risk.expectedScoreAfterAction} />
+        <RiskComposition
+          score={score}
+          risks={risks}
+          expected={summary.risk.expectedScoreAfterAction}
+          advanced={advanced}
+        />
         <ProtectionCard risks={risks} lending={lending} onProtect={onProtect} />
       </section>
-      <StressScenarios summary={summary} />
-      {lending ? <LendingRisk position={lending} risk={lendingRisk} /> : null}
-      {liquidity ? <LiquidityRisk position={liquidity} risk={liquidityRisk} /> : null}
-      <FindingsTable risks={risks} envelope={envelope} />
-      <EvidenceSummary risks={risks} summary={summary} />
+      <StressScenarios summary={summary} advanced={advanced} />
+      {lending ? <LendingRisk position={lending} risk={lendingRisk} advanced={advanced} /> : null}
+      {liquidity ? <LiquidityRisk position={liquidity} risk={liquidityRisk} advanced={advanced} /> : null}
+      <FindingsTable risks={risks} envelope={envelope} advanced={advanced} />
+      <EvidenceSummary risks={risks} summary={summary} advanced={advanced} />
     </main>
   );
 }
 
-function RiskEmpty({ summary, onInspect }: { summary: PortfolioSummary | null; onInspect: () => void }) {
+function RiskEmpty({
+  summary,
+  onInspect,
+  viewMode,
+  onViewModeChange,
+}: {
+  summary: PortfolioSummary | null;
+  onInspect: () => void;
+  viewMode: RiskViewMode;
+  onViewModeChange: (mode: RiskViewMode) => void;
+}) {
   return (
     <main className="risk-dashboard">
-      <header className="risk-heading">
-        <h1>Risk monitor</h1>
-        <p>What can go wrong, how much capital is affected, and what happens if you do nothing?</p>
+      <header className="risk-heading risk-heading-with-mode">
+        <div>
+          <h1>Risk monitor</h1>
+          <p>What can go wrong, how much capital is affected, and what happens if you do nothing?</p>
+        </div>
+        <RiskModeToggle value={viewMode} onChange={onViewModeChange} />
       </header>
       <section className="page-state-stage with-heading">
         <EmptyState
@@ -123,7 +182,8 @@ function RiskEmpty({ summary, onInspect }: { summary: PortfolioSummary | null; o
               </button>
             ) : (
               <small className="empty-evidence-note">
-                Composite risk {summary.risk.score}/100 · {Math.round(summary.risk.confidence * 100)}% model
+                {viewMode === "advanced" ? "Composite risk" : "Overall risk"} {summary.risk.score}/100 ·{" "}
+                {Math.round(summary.risk.confidence * 100)}% {viewMode === "advanced" ? "model" : "evidence"}{" "}
                 confidence
               </small>
             )
@@ -131,6 +191,38 @@ function RiskEmpty({ summary, onInspect }: { summary: PortfolioSummary | null; o
         />
       </section>
     </main>
+  );
+}
+
+function RiskModeToggle({
+  value,
+  onChange,
+}: {
+  value: RiskViewMode;
+  onChange: (mode: RiskViewMode) => void;
+}) {
+  return (
+    <div className="risk-mode-control" aria-label="Risk detail level">
+      <span>Detail level</span>
+      <div role="group" aria-label="Choose risk detail level">
+        <button
+          type="button"
+          className={value === "easy" ? "active" : ""}
+          aria-pressed={value === "easy"}
+          onClick={() => onChange("easy")}
+        >
+          Easy
+        </button>
+        <button
+          type="button"
+          className={value === "advanced" ? "active" : ""}
+          aria-pressed={value === "advanced"}
+          onClick={() => onChange("advanced")}
+        >
+          Advanced
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -160,10 +252,12 @@ function RiskComposition({
   score,
   risks,
   expected,
+  advanced,
 }: {
   score: number;
   risks: RiskFinding[];
   expected: number | null;
+  advanced: boolean;
 }) {
   const categories = [...new Set(risks.map((risk) => risk.category))].map((category) => ({
     category,
@@ -173,7 +267,7 @@ function RiskComposition({
     <section className="risk-card risk-composition">
       <header>
         <h2>
-          Risk composition <Icon name="info" size={12} />
+          {advanced ? "Risk composition" : "What is driving your risk?"} <Icon name="info" size={12} />
         </h2>
       </header>
       <div className="risk-composition-body">
@@ -187,18 +281,23 @@ function RiskComposition({
           </div>
         </div>
         <div className="risk-category-list">
-          {categories.map((item) => (
-            <div key={item.category}>
-              <i className="risk-dot" style={{ background: riskColor(item.score) }} />
-              <span>{categoryLabel(item.category)}</span>
-              <b>{item.score}</b>
-              <em>
-                <i style={{ width: `${item.score}%`, background: riskColor(item.score) }} />
-              </em>
-            </div>
-          ))}
+          {categories.length === 0 ? (
+            <p>No open finding categories in the current evidence set.</p>
+          ) : (
+            categories.map((item) => (
+              <div key={item.category}>
+                <i className="risk-dot" style={{ background: riskColor(item.score) }} />
+                <span>{advanced ? categoryLabel(item.category) : easyCategoryLabel(item.category)}</span>
+                <b>{item.score}</b>
+                <em>
+                  <i style={{ width: `${item.score}%`, background: riskColor(item.score) }} />
+                </em>
+              </div>
+            ))
+          )}
           <p>
-            Expected after protection: <strong>{expected ?? "available after simulation"}</strong>
+            {advanced ? "Expected after protection" : "Possible score after a simulated action"}:{" "}
+            <strong>{expected ?? "available after simulation"}</strong>
           </p>
         </div>
       </div>
@@ -254,12 +353,14 @@ function ProtectionCard({
   );
 }
 
-function StressScenarios({ summary }: { summary: PortfolioSummary }) {
+function StressScenarios({ summary, advanced }: { summary: PortfolioSummary; advanced: boolean }) {
+  const partial = summary.netWorthUsd === null;
+  const excluded = summary.scenarios[0]?.excludedPositionCount ?? summary.missingValuationCount;
   const entries = [
     {
       name: "Current",
       loss: 0,
-      net: numeric(summary.netWorthUsd),
+      net: numeric(summary.netWorthUsd ?? summary.valuedSubtotalUsd),
       affected: summary.valuedPositionCount,
       explanation: "Current valued portfolio before applying a BTC price shock.",
     },
@@ -275,10 +376,17 @@ function StressScenarios({ summary }: { summary: PortfolioSummary }) {
     <section className="risk-card risk-stress">
       <header>
         <div>
-          <h2>BTC stress scenarios</h2>
+          <h2>{advanced ? "BTC stress scenarios" : "What if Bitcoin falls?"}</h2>
           <span>
-            How the currently valued portfolio responds when BTC falls while other assumptions remain fixed.
+            {advanced
+              ? "How the currently valued portfolio responds when BTC falls while other assumptions remain fixed."
+              : "A what-if test showing the estimated change in your valued positions—not a prediction."}
           </span>
+          {partial ? (
+            <strong className="risk-scenario-scope">
+              Valued subset · {excluded} position{excluded === 1 ? "" : "s"} excluded
+            </strong>
+          ) : null}
         </div>
         <div className="risk-chart-legend">
           <span>
@@ -293,14 +401,16 @@ function StressScenarios({ summary }: { summary: PortfolioSummary }) {
       </header>
       <div className="risk-scenario-grid">
         {entries.map((entry, index) => (
-          <ScenarioCard key={entry.name} {...entry} isBaseline={index === 0} />
+          <ScenarioCard key={entry.name} {...entry} isBaseline={index === 0} advanced={advanced} />
         ))}
       </div>
       <footer className="risk-scenario-note">
         <Icon name="info" size={14} />
         <span>
-          These are deterministic stress estimates, not price forecasts. Unsupported or unpriced positions
-          remain excluded rather than assigned invented values.
+          These are deterministic stress estimates, not price forecasts.{" "}
+          {partial
+            ? `Only accepted valuations are modeled; ${excluded} unsupported or insufficiently evidenced position${excluded === 1 ? " is" : "s are"} excluded, never treated as zero.`
+            : "Every portfolio position is included in the modeled totals."}
         </span>
       </footer>
     </section>
@@ -314,6 +424,7 @@ function ScenarioCard({
   affected,
   explanation,
   isBaseline,
+  advanced,
 }: {
   name: string;
   loss: number | null;
@@ -321,22 +432,23 @@ function ScenarioCard({
   affected: number;
   explanation: string;
   isBaseline: boolean;
+  advanced: boolean;
 }) {
   const total = loss != null && net != null ? loss + net : null;
   const lossPercent = total && total > 0 && loss != null ? (loss / total) * 100 : loss === 0 ? 0 : null;
   return (
     <article className="risk-scenario-card" title={explanation}>
       <header>
-        <span>BTC price</span>
-        <strong>{shockLabel(name)}</strong>
+        <span>{advanced ? "BTC price" : isBaseline ? "Starting point" : "If BTC falls"}</span>
+        <strong>{advanced || isBaseline ? shockLabel(name) : shockLabel(name).replace("-", "")}</strong>
       </header>
       <div className="risk-scenario-values">
         <p>
-          <span>Estimated loss</span>
+          <span>{advanced ? "Estimated loss" : "Value decrease"}</span>
           <strong className="loss">{loss == null ? "Unavailable" : formatUsd(String(loss))}</strong>
         </p>
         <p>
-          <span>Portfolio after</span>
+          <span>{advanced ? "Portfolio after" : "Estimated value left"}</span>
           <strong className="net">{net == null ? "Unavailable" : formatUsd(String(net))}</strong>
         </p>
       </div>
@@ -363,11 +475,22 @@ function ScenarioCard({
           {affected} {isBaseline ? "valued" : "BTC-linked"} position{affected === 1 ? "" : "s"}
         </span>
       </div>
+      {!advanced && !isBaseline ? (
+        <p className="risk-scenario-plain">{plainScenarioMeaning(lossPercent)}</p>
+      ) : null}
     </article>
   );
 }
 
-function LendingRisk({ position, risk }: { position: LendingPosition; risk: RiskFinding | undefined }) {
+function LendingRisk({
+  position,
+  risk,
+  advanced,
+}: {
+  position: LendingPosition;
+  risk: RiskFinding | undefined;
+  advanced: boolean;
+}) {
   const health = evidence(risk, "healthFactor"),
     ltv = evidence(risk, "ltv"),
     liquidationPrice = evidence(risk, "estimatedLiquidationPriceUsd");
@@ -378,7 +501,7 @@ function LendingRisk({ position, risk }: { position: LendingPosition; risk: Risk
         <div className="risk-position-title">
           <AssetIcon asset={position.collateral.asset} size={32} />
           <div>
-            <h2>Lending liquidation risk</h2>
+            <h2>{advanced ? "Lending liquidation risk" : "Loan safety"}</h2>
             <span>
               {position.collateral.asset} collateral securing {position.debt.asset} debt
             </span>
@@ -388,50 +511,82 @@ function LendingRisk({ position, risk }: { position: LendingPosition; risk: Risk
           </StatusChip>
         </div>
         <p>
-          Liquidation eligibility begins when the modeled protocol threshold is crossed <Icon name="info" size={12} />
+          {advanced
+            ? "Liquidation eligibility begins when the modeled protocol threshold is crossed"
+            : "Liquidation can begin when the health factor reaches 1.0"}{" "}
+          <Icon name="info" size={12} />
         </p>
       </header>
+      {!advanced ? <HealthFactorExplainer health={health} position={position} risk={risk} /> : null}
       <div className="risk-lending-metrics">
         <RiskDatum
           label="Health factor"
           value={health ?? "Unavailable"}
-          detail={health && Number(health) > 1 ? "Buffer present" : "Review required"}
+          detail={
+            advanced
+              ? health && Number(health) > 1
+                ? "Buffer present"
+                : "Review required"
+              : healthFactorLabel(health)
+          }
         />
         <RiskDatum
-          label="LTV"
+          label={advanced ? "LTV" : "Debt vs collateral"}
           value={ltv ? percentDecimal(ltv) : "Unavailable"}
-          detail={`Max ${(position.parameters.maximumLtvBps / 100).toFixed(0)}%`}
+          detail={
+            advanced
+              ? `Max ${(position.parameters.maximumLtvBps / 100).toFixed(0)}%`
+              : `About ${ltv ? percentDecimal(ltv) : "an unknown share"} borrowed per $100 of collateral`
+          }
         />
         <RiskDatum
-          label="Liquidation threshold"
+          label={advanced ? "Liquidation threshold" : "Liquidation begins near"}
           value={`${(position.parameters.liquidationThresholdBps / 100).toFixed(0)}%`}
-          detail="Modeled protocol parameter"
+          detail={advanced ? "Modeled protocol parameter" : "Protocol debt-to-collateral boundary"}
         />
         <RiskDatum
-          label="Borrow APR"
+          label={advanced ? "Borrow APR" : "Yearly borrowing rate"}
           value={position.rates ? `${(position.rates.borrowAprBps / 100).toFixed(2)}%` : "Unavailable"}
-          detail={position.rates ? "Variable rate" : "Rate evidence missing"}
+          detail={
+            position.rates
+              ? advanced
+                ? "Variable rate"
+                : "Current variable rate; it can change"
+              : "Rate evidence missing"
+          }
         />
         <RiskDatum
-          label="Supply APR"
+          label={advanced ? "Supply APR" : "Yearly supply yield"}
           value={position.rates ? `${(position.rates.supplyAprBps / 100).toFixed(2)}%` : "Unavailable"}
-          detail={position.rates ? "Current rate" : "Rate evidence missing"}
+          detail={
+            position.rates
+              ? advanced
+                ? "Current rate"
+                : "Current rate, not a guaranteed return"
+              : "Rate evidence missing"
+          }
         />
         <RiskDatum
-          label="Projected debt (30d)"
+          label={advanced ? "Projected debt (30d)" : "Estimated debt in 30 days"}
           value={projection ? humanAmount(projection.amountAtomic, position.debt.decimals) : "Unavailable"}
           detail={position.debt.asset}
         />
         <RiskDatum
-          label="Liquidation price"
+          label={advanced ? "Liquidation price" : "Price where liquidation may begin"}
           value={liquidationPrice ? formatUsd(liquidationPrice) : "Unavailable"}
-          detail={liquidationPrice ? "Model estimate" : "Invalid or missing inputs"}
+          detail={
+            liquidationPrice
+              ? advanced
+                ? "Model estimate"
+                : "Assumes debt and other inputs do not change"
+              : "Invalid or missing inputs"
+          }
           caution={!liquidationPrice}
         />
       </div>
       <div className="risk-lending-charts">
-        <HealthChart current={health} risk={risk} />
-        <DebtProjection position={position} />
+        <HealthChart current={health} risk={risk} advanced={advanced} />
+        <DebtProjection position={position} advanced={advanced} />
       </div>
       <div className="risk-meaning">
         <Icon name="info" size={15} />
@@ -465,14 +620,75 @@ function RiskDatum({
   );
 }
 
-function HealthChart({ current, risk }: { current: string | null; risk: RiskFinding | undefined }) {
+function HealthFactorExplainer({
+  health,
+  position,
+  risk,
+}: {
+  health: string | null;
+  position: LendingPosition;
+  risk: RiskFinding | undefined;
+}) {
+  const value = numeric(health);
+  const declineRoom = value != null && value > 1 ? (1 - 1 / value) * 100 : value == null ? null : 0;
+  const firstUnsafeScenario = risk?.scenarios.find((scenario) => {
+    const result = numeric(scenario.result);
+    return result != null && result <= 1;
+  });
+  return (
+    <div className={`risk-health-explainer ${healthFactorTone(health)}`}>
+      <div className="risk-health-reading">
+        <span>Your lending safety reading</span>
+        <strong>{health ?? "Unavailable"}</strong>
+        <b>{healthFactorLabel(health)}</b>
+      </div>
+      <div className="risk-health-copy">
+        <h3>How to interpret this number</h3>
+        {value == null ? (
+          <p>
+            RiskOS cannot interpret this position until both collateral and debt have accepted USD valuations.
+          </p>
+        ) : (
+          <p>
+            <strong>1.0 is the liquidation boundary.</strong> Higher is safer. RiskOS uses 1.35 as its
+            monitoring target; your current reading is {value >= 1.35 ? "above" : "below"} that target.
+          </p>
+        )}
+        <p>
+          {declineRoom == null
+            ? "A price-buffer estimate is withheld because the required inputs are unavailable."
+            : `If debt and other inputs stayed unchanged, the modeled collateral could fall about ${declineRoom.toFixed(1)}% before this reading reached 1.0.`}
+          {firstUnsafeScenario
+            ? ` The ${firstUnsafeScenario.name.toLowerCase()} test reaches the liquidation boundary.`
+            : " None of the displayed shock tests reaches 1.0."}
+        </p>
+        <small>
+          Based on the current {position.collateral.asset} collateral, {position.debt.asset} debt, and the
+          protocol’s {(position.parameters.liquidationThresholdBps / 100).toFixed(0)}% liquidation threshold.
+        </small>
+      </div>
+    </div>
+  );
+}
+
+function HealthChart({
+  current,
+  risk,
+  advanced,
+}: {
+  current: string | null;
+  risk: RiskFinding | undefined;
+  advanced: boolean;
+}) {
   const values = [current, ...(risk?.scenarios.map((scenario) => scenario.result) ?? [])].map((value) =>
     value && Number.isFinite(Number(value)) ? Number(value) : null,
   );
   return (
     <div className="risk-mini-chart">
       <header>
-        <h3>Health factor vs BTC price shock</h3>
+        <h3>
+          {advanced ? "Health factor vs BTC price shock" : "How a Bitcoin fall changes your safety buffer"}
+        </h3>
         <span>
           <i />
           Health factor <b />
@@ -485,7 +701,7 @@ function HealthChart({ current, risk }: { current: string | null; risk: RiskFind
           {values.map((value, index) => (
             <div key={index}>
               <b style={{ bottom: `${Math.min(100, Math.max(0, ((value ?? 0) / 2) * 100))}%` }}>
-                {value?.toFixed(4) ?? "n/a"}
+                {value?.toFixed(4) ?? "Not modeled"}
               </b>
               <i style={{ height: `${Math.min(100, Math.max(0, ((value ?? 0) / 2) * 100))}%` }} />
               <span>
@@ -501,12 +717,12 @@ function HealthChart({ current, risk }: { current: string | null; risk: RiskFind
   );
 }
 
-function DebtProjection({ position }: { position: LendingPosition }) {
+function DebtProjection({ position, advanced }: { position: LendingPosition; advanced: boolean }) {
   if (!position.rates)
     return (
       <div className="risk-mini-chart">
         <header>
-          <h3>Projected debt growth</h3>
+          <h3>{advanced ? "Projected debt growth" : "How the debt may grow"}</h3>
         </header>
         <Unavailable label="Debt-rate evidence unavailable" />
       </div>
@@ -525,7 +741,10 @@ function DebtProjection({ position }: { position: LendingPosition }) {
   return (
     <div className="risk-mini-chart">
       <header>
-        <h3>Projected debt growth ({(position.rates.borrowAprBps / 100).toFixed(2)}% APR)</h3>
+        <h3>
+          {advanced ? "Projected debt growth" : "How the debt may grow"} (
+          {(position.rates.borrowAprBps / 100).toFixed(2)}% APR)
+        </h3>
       </header>
       <div className="risk-debt-bars">
         {entries.map((item) => (
@@ -541,7 +760,15 @@ function DebtProjection({ position }: { position: LendingPosition }) {
   );
 }
 
-function LiquidityRisk({ position, risk }: { position: LiquidityPosition; risk: RiskFinding | undefined }) {
+function LiquidityRisk({
+  position,
+  risk,
+  advanced,
+}: {
+  position: LiquidityPosition;
+  risk: RiskFinding | undefined;
+  advanced: boolean;
+}) {
   const lower = Number(position.lowerPrice),
     upper = Number(position.upperPrice),
     current = Number(position.currentPrice);
@@ -556,13 +783,13 @@ function LiquidityRisk({ position, risk }: { position: LiquidityPosition; risk: 
         <div className="risk-position-title">
           <ProtocolIcon protocol="bitflow" size={32} />
           <div>
-            <h2>Bitflow concentrated liquidity</h2>
+            <h2>{advanced ? "Bitflow concentrated liquidity" : "Bitflow liquidity position"}</h2>
             <span>
               {position.token0.asset} / {position.token1.asset}
             </span>
           </div>
           <StatusChip tone={inRange ? "healthy" : "caution"}>
-            {inRange ? "Active · In range" : "Out of range"}
+            {inRange ? (advanced ? "Active · In range" : "Earning fees now") : "Outside earning range"}
           </StatusChip>
           <StatusChip tone={severityTone(risk?.severity)}>
             {titleCase(risk?.severity ?? "low")} risk
@@ -601,16 +828,16 @@ function LiquidityRisk({ position, risk }: { position: LiquidityPosition; risk: 
           )}
         </div>
         <div className="risk-distance">
-          <h3>Distance to range</h3>
+          <h3>{advanced ? "Distance to range" : "Room before leaving the earning range"}</h3>
           <div>
-            <strong>{fromLow == null ? "n/a" : `${fromLow.toFixed(1)}%`}</strong>
+            <strong>{fromLow == null ? "Not modeled" : `${fromLow.toFixed(1)}%`}</strong>
             <span>from low</span>
-            <strong>{fromHigh == null ? "n/a" : `${fromHigh.toFixed(1)}%`}</strong>
+            <strong>{fromHigh == null ? "Not modeled" : `${fromHigh.toFixed(1)}%`}</strong>
             <span>from high</span>
           </div>
         </div>
         <div className="risk-exit">
-          <h3>Exit liquidity</h3>
+          <h3>{advanced ? "Exit liquidity" : "Cost to exit now"}</h3>
           <strong>
             {position.exitSlippageBps == null
               ? "Quote unavailable"
@@ -625,17 +852,21 @@ function LiquidityRisk({ position, risk }: { position: LiquidityPosition; risk: 
       </div>
       <div className="risk-liquidity-facts">
         <RiskDatum
-          label="Impermanent-loss exposure"
+          label={advanced ? "Impermanent-loss exposure" : "Pool balance can change"}
           value={inRange ? "Monitored" : "Elevated"}
-          detail="Track price toward range edges"
+          detail={
+            advanced
+              ? "Track price toward range edges"
+              : "Price movement can leave you holding more of one token"
+          }
         />
         <RiskDatum
-          label="Range status"
-          value={inRange ? "In range" : "Out of range"}
+          label={advanced ? "Range status" : "Fee-earning status"}
+          value={inRange ? (advanced ? "In range" : "Earning fees") : "Not earning fees"}
           detail={inRange ? "Currently earning trading fees" : "Position may be one-sided"}
         />
         <RiskDatum
-          label="Exit liquidity"
+          label={advanced ? "Exit liquidity" : "Current exit estimate"}
           value={
             position.exitSlippageBps == null
               ? "Unknown until quote"
@@ -648,52 +879,72 @@ function LiquidityRisk({ position, risk }: { position: LiquidityPosition; risk: 
   );
 }
 
-function FindingsTable({ risks, envelope }: { risks: RiskFinding[]; envelope: PositionEnvelope | null }) {
+function FindingsTable({
+  risks,
+  envelope,
+  advanced,
+}: {
+  risks: RiskFinding[];
+  envelope: PositionEnvelope | null;
+  advanced: boolean;
+}) {
   return (
     <section className="risk-card risk-findings">
       <header>
         <h2>
-          Findings, ordered by impact <Icon name="info" size={12} />
+          {advanced ? "Findings, ordered by impact" : "What needs your attention"}{" "}
+          <Icon name="info" size={12} />
         </h2>
       </header>
       <div className="risk-findings-wrap">
         <table>
           <thead>
             <tr>
-              <th>Finding</th>
-              <th>Severity</th>
-              <th>Affected position</th>
-              <th>Current evidence</th>
-              <th>If ignored</th>
-              <th>Action</th>
+              <th>{advanced ? "Finding" : "Issue"}</th>
+              <th>{advanced ? "Severity" : "Level"}</th>
+              <th>{advanced ? "Affected position" : "Where"}</th>
+              <th>{advanced ? "Current evidence" : "What we know"}</th>
+              <th>{advanced ? "If ignored" : "What could happen"}</th>
+              <th>{advanced ? "Action" : "Next step"}</th>
             </tr>
           </thead>
           <tbody>
-            {[...risks]
-              .sort((a, b) => b.score - a.score)
-              .map((risk) => {
-                const position = envelope?.positions.find((item) => item.id === risk.positionId);
-                return (
-                  <tr key={risk.riskId}>
-                    <td>
-                      <strong>{risk.title}</strong>
-                    </td>
-                    <td>
-                      <StatusChip tone={severityTone(risk.severity)}>{titleCase(risk.severity)}</StatusChip>
-                    </td>
-                    <td>{position ? positionLabel(position) : risk.positionId}</td>
-                    <td>
-                      {risk.plainMetrics[0]
-                        ? `${risk.plainMetrics[0].label}: ${risk.plainMetrics[0].value}`
-                        : "Evidence attached"}
-                    </td>
-                    <td>{risk.ifYouDoNothing}</td>
-                    <td>
-                      {risk.recommendedActions[0] ? titleCase(risk.recommendedActions[0].type) : "Monitor"}
-                    </td>
-                  </tr>
-                );
-              })}
+            {risks.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="risk-finding-empty">
+                  No open findings. Continue monitoring after material price, debt, or protocol-state changes.
+                </td>
+              </tr>
+            ) : (
+              [...risks]
+                .sort((a, b) => b.score - a.score)
+                .map((risk) => {
+                  const position = envelope?.positions.find((item) => item.id === risk.positionId);
+                  const affectedPosition = position ? positionLabel(position) : risk.positionId;
+                  return (
+                    <tr key={risk.riskId}>
+                      <td className="risk-finding-title">
+                        <strong>{risk.title}</strong>
+                      </td>
+                      <td className="risk-finding-severity">
+                        <StatusChip tone={severityTone(risk.severity)}>{titleCase(risk.severity)}</StatusChip>
+                      </td>
+                      <td className="risk-finding-position" title={affectedPosition}>
+                        <span>{compactAssetLabel(affectedPosition)}</span>
+                      </td>
+                      <td className="risk-finding-evidence">
+                        {risk.plainMetrics[0]
+                          ? `${risk.plainMetrics[0].label}: ${risk.plainMetrics[0].value}`
+                          : "Evidence attached"}
+                      </td>
+                      <td className="risk-finding-consequence">{risk.ifYouDoNothing}</td>
+                      <td className="risk-finding-action">
+                        {risk.recommendedActions[0] ? titleCase(risk.recommendedActions[0].type) : "Monitor"}
+                      </td>
+                    </tr>
+                  );
+                })
+            )}
           </tbody>
         </table>
       </div>
@@ -701,24 +952,50 @@ function FindingsTable({ risks, envelope }: { risks: RiskFinding[]; envelope: Po
   );
 }
 
-function EvidenceSummary({ risks, summary }: { risks: RiskFinding[]; summary: PortfolioSummary }) {
+function EvidenceSummary({
+  risks,
+  summary,
+  advanced,
+}: {
+  risks: RiskFinding[];
+  summary: PortfolioSummary;
+  advanced: boolean;
+}) {
   const models = [...new Map(risks.map((risk) => [`${risk.model.id}@${risk.model.version}`, risk])).values()];
-  const expiry = Math.min(...risks.map((risk) => Date.parse(risk.expiresAt)).filter(Number.isFinite));
+  const expiryTimes = risks.map((risk) => Date.parse(risk.expiresAt)).filter(Number.isFinite);
+  const expiry = expiryTimes.length ? Math.min(...expiryTimes) : Number.NaN;
   return (
     <section className="risk-card risk-evidence-summary">
       <div>
         <h2>
-          Model versions and evidence <Icon name="info" size={12} />
+          {advanced ? "Model versions and evidence" : "Can these results be trusted?"}{" "}
+          <Icon name="info" size={12} />
         </h2>
         <div className="risk-models">
-          {models.map((risk) => (
-            <p key={risk.riskId}>
-              <strong>
-                {risk.model.id}@{risk.model.version}
-              </strong>
-              <span>{Math.round(risk.confidence.score * 100)}% confidence</span>
+          {!advanced ? (
+            <p className="risk-easy-evidence">
+              <strong>{Math.round(summary.risk.confidence * 100)}% evidence confidence</strong>
+              <span>
+                {summary.data.state === "complete"
+                  ? "Required inputs are present and current for this analysis."
+                  : "Some inputs are incomplete or degraded; affected calculations are withheld rather than guessed."}
+              </span>
             </p>
-          ))}
+          ) : models.length === 0 ? (
+            <p>
+              <strong>No open finding models</strong>
+              <span>{Math.round(summary.risk.confidence * 100)}% portfolio model confidence</span>
+            </p>
+          ) : (
+            models.map((risk) => (
+              <p key={risk.riskId}>
+                <strong>
+                  {risk.model.id}@{risk.model.version}
+                </strong>
+                <span>{Math.round(risk.confidence.score * 100)}% confidence</span>
+              </p>
+            ))
+          )}
           <p>
             <strong>Last updated: {new Date(summary.data.lastUpdatedAt).toLocaleString()}</strong>
             <span>
@@ -732,7 +1009,14 @@ function EvidenceSummary({ risks, summary }: { risks: RiskFinding[]; summary: Po
       <aside className={summary.data.state === "complete" ? "healthy" : "caution"}>
         <strong>Calculation health</strong>
         <span>{summary.data.state === "complete" ? "● Healthy" : `● ${titleCase(summary.data.state)}`}</span>
-        {summary.data.warnings[0] ? <p>{summary.data.warnings[0]}</p> : null}
+        {operationalWarnings(summary.data.warnings)[0] ? (
+          <p>{operationalWarnings(summary.data.warnings)[0]}</p>
+        ) : summary.data.state !== "complete" ? (
+          <p>
+            Exact portfolio totals stay withheld until every position has verified quantity and valuation
+            evidence. Valued subsets remain available.
+          </p>
+        ) : null}
       </aside>
     </section>
   );
@@ -760,6 +1044,35 @@ function shockLabel(value: string) {
   const percentage = value.match(/-?\d+(?:\.\d+)?/)?.[0];
   return percentage ? `${percentage}%` : value;
 }
+function plainScenarioMeaning(lossPercent: number | null) {
+  if (lossPercent == null)
+    return "This impact is withheld because the required valuation evidence is incomplete.";
+  if (lossPercent < 5) return "Small modeled effect on the currently valued portfolio.";
+  if (lossPercent < 20) return "Noticeable modeled loss; review exposed positions.";
+  if (lossPercent < 40) return "Large modeled loss; your portfolio is meaningfully sensitive to Bitcoin.";
+  return "Severe modeled loss; a large share of valued capital follows Bitcoin downward.";
+}
+function riskScoreMeaning(score: number) {
+  if (score >= 80) return "Critical — address the highest-impact issues now";
+  if (score >= 60) return "High — ordinary market moves could materially affect positions";
+  if (score >= 30) return "Moderate — monitor the identified weak points";
+  return "Low — no major issue in the current evidence";
+}
+export function healthFactorLabel(health: string | null) {
+  const value = numeric(health);
+  if (value == null) return "Cannot be interpreted without complete valuations";
+  if (value <= 1) return "At or beyond the liquidation boundary";
+  if (value < 1.1) return "Very small safety buffer";
+  if (value < 1.35) return "Below the RiskOS monitoring target";
+  if (value < 1.5) return "Above target, with a moderate buffer";
+  return "Above target, with a stronger buffer";
+}
+function healthFactorTone(health: string | null) {
+  const value = numeric(health);
+  if (value == null || value < 1.1) return "danger";
+  if (value < 1.35) return "caution";
+  return "healthy";
+}
 function titleCase(value: string) {
   return value.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -769,6 +1082,19 @@ function categoryLabel(category: RiskFinding["category"]) {
     : category === "liquidity"
       ? "Liquidity (concentrated)"
       : titleCase(category);
+}
+function easyCategoryLabel(category: RiskFinding["category"]) {
+  return category === "liquidation"
+    ? "Loan liquidation"
+    : category === "liquidity"
+      ? "Liquidity range"
+      : category === "oracle"
+        ? "Price or data quality"
+        : category === "bridge"
+          ? "Bitcoin bridge"
+          : category === "unsupported"
+            ? "Unsupported exposure"
+            : titleCase(category);
 }
 function riskName(classification: PortfolioSummary["risk"]["classification"]) {
   return classification === "high-risk" ? "High risk" : titleCase(classification);
@@ -793,4 +1119,10 @@ function positionLabel(position: PositionEnvelope["positions"][number]) {
     : position.type === "lending"
       ? `${position.collateral.asset} / ${position.debt.asset}`
       : position.asset.asset;
+}
+
+export function compactAssetLabel(label: string): string {
+  if (!label.includes("::")) return label;
+  const tokenName = label.split("::").at(-1)?.trim();
+  return tokenName || label;
 }

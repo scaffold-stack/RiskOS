@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { BitcoinEsploraClient, parseChainhookPayload, projectProtocolEvents, reconcileSbtcOperation, SbtcEmilyClient, unwrapRegistryPayload } from "../packages/data-foundation/src/index.js";
 
 type Json = Record<string, unknown>;
@@ -66,11 +67,16 @@ const result = reconcileSbtcOperation({
   emily: emilyDeposit,
   bitcoin: bitcoinEvidence,
 });
-console.log(JSON.stringify({
+const artifact = {
+  kind: "riskos-sbtc-mainnet-reconciliation",
   checkedAt: new Date().toISOString(),
   stacks: { txid: completed.txId, blockHeight: completed.blockHeight, indexBlockHash: completed.indexBlockHash, owner: completed.ownerAddress },
   emily: emilyDeposit ? { status: emilyDeposit.status, amount: emilyDeposit.amount, fee: emilyDeposit.fulfillment?.BtcFee ?? null } : null,
   bitcoin: bitcoinEvidence,
   reconciliation: { state: result.state, canonical: result.canonical, reasons: result.reasons },
-}, null, 2));
+};
+const outputPath = resolve(process.argv[2] ?? "artifacts/sbtc-mainnet-reconciliation.json");
+await mkdir(dirname(outputPath), { recursive: true });
+await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+console.log(JSON.stringify({ output: outputPath, ...artifact }, null, 2));
 if (result.state !== "completed" || !result.canonical) process.exitCode = 1;

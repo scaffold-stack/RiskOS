@@ -39,6 +39,8 @@ RiskOS is a non-custodial, evidence-backed risk and protective-action layer for 
 - Candidate registry bootstrap for local live mode (production still requires signed activation)
 - Advisory-only mainnet protect (shadow intents; broadcast disabled)
 - `@riskos/client` SDK and embeddable `RiskOsWidget` with Integrations preview page
+- Standalone publishable SDK with typed endpoint coverage, aborts/timeouts, safe GET retries, structured errors, and API-key support
+- Enforceable Free/Pro/Treasury/Developer/Protocol catalog with hashed API keys, UTC-month quotas, and wallet entitlements
 - Ed25519 dual-reviewed registry signing/activation (`registry:keygen|sign|activate`) with `REGISTRY_SIGNED_PATH` boot
 - Live pricing uses a 2-of-3 DIA/Pyth/fixed-ID CoinGecko quorum and fails closed without two agreeing sources; no silent static-price fallback
 - 100-address comparison gate + artifact (`npm run gate:100-addresses`)
@@ -85,3 +87,4 @@ Fixture mode is intentionally testnet-only. Mainnet reads prefer an Ed25519-sign
 
 See [the data-foundation guide](docs/data-foundation.md) for ingestion, registry, reconciliation, and PostgreSQL operations.
 See [the mainnet work order](docs/mainnet-work-order.md) for the Zest shadow scope and the gates that still prevent broadcast.
+See [the commercial launch guide](docs/commercial-launch.md) for plan boundaries, API-key provisioning, quotas, and the manual-to-self-service billing path.

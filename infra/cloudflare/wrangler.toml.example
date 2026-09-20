@@ -4,6 +4,7 @@
 # Root directory: repository root
 # Environment variables (Production):
 #   VITE_API_URL=https://riskosfolio-api.fly.dev
+#   VITE_SALES_URL=https://your-reviewed-sales-intake.example
 
 name = "riskosfolio"
 compatibility_date = "2026-09-19"
@@ -11,3 +12,5 @@ compatibility_date = "2026-09-19"
 [vars]
 # Overridden at build time by Cloudflare Pages env; kept here as documentation.
 VITE_API_URL = "https://riskosfolio-api.fly.dev"
+# Required before enabling paid-plan request buttons.
+VITE_SALES_URL = "https://your-reviewed-sales-intake.example"

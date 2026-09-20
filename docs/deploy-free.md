@@ -16,7 +16,7 @@
 | Web | [Cloudflare Pages](https://pages.cloudflare.com) | `npm run build:web` → `apps/web/dist` |
 | Prices / chain | Hiro key, QuickNode reference, CoinGecko, Coinbase, DefiLlama | already free/public endpoints |
 
-Wallet httpOnly cookies need the web and API on the **same registrable domain**. On free `*.pages.dev` + `*.fly.dev` origins, public address inspect works; Connect wallet sessions may not until you attach a custom domain (also free on Cloudflare).
+Wallet httpOnly cookies need the web and API on the **same registrable domain**. On free `*.pages.dev` + `*.fly.dev` origins, public address inspect works; Connect wallet sessions may not until you attach a custom domain (also free on Cloudflare). Add every approved browser embed origin to the comma-separated `WEB_ORIGIN` allowlist; paid API keys must remain server-side.
 
 ## 0. Preconditions
 
@@ -55,7 +55,9 @@ VITE_API_URL=https://riskosfolio-api.fly.dev npm run build:web
 npx wrangler pages deploy apps/web/dist --project-name=riskosfolio
 ```
 
-Set Pages production env `VITE_API_URL=https://riskosfolio-api.fly.dev`.
+Set Pages production env `VITE_API_URL=https://riskosfolio-api.fly.dev`. Set
+`VITE_SALES_URL` to the reviewed paid-pilot intake URL before enabling paid
+plan requests; the UI deliberately shows manual provisioning when it is absent.
 
 Then set Fly secret `WEB_ORIGIN` to the Pages URL and redeploy or `fly secrets set WEB_ORIGIN=...`.
 
@@ -63,8 +65,11 @@ Then set Fly secret `WEB_ORIGIN` to the Pages URL and redeploy or `fly secrets s
 
 ```sh
 curl -fsS https://riskosfolio-api.fly.dev/health
+curl -fsS https://riskosfolio-api.fly.dev/v1/plans
 curl -fsS "https://riskosfolio-api.fly.dev/v1/address/SP2R8C36A8KVBBWYC4ASD6V36S2E9VJ0FXWV2T4CP/overview" | head
 npm run audit:projections   # after DATABASE_URL points at Neon
 ```
 
 Protect remains advisory/shadow on mainnet.
+Apply migration `006_commercial_foundation.sql` before provisioning paid API
+keys or wallet plans. See [commercial-launch.md](./commercial-launch.md).

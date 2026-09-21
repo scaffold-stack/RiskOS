@@ -81,12 +81,44 @@ function timestamp(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function v2OperationEvent(rawOperation: unknown, fallbackIndex: number): Record<string, unknown> {
+  const operation = object(rawOperation);
+  const metadata = object(operation.metadata);
+  const identifier = object(operation.operation_identifier);
+  const eventIndex = integer(identifier.index) ?? integer(operation.event_index) ?? fallbackIndex;
+  const eventType = text(operation.type) ?? text(operation.event_type) ?? "unknown";
+  const data = {
+    ...metadata,
+    contract_identifier:
+      metadata.contract_identifier ?? operation.contract_identifier ?? operation.contract_id,
+    topic: metadata.topic ?? operation.topic,
+    asset_identifier:
+      metadata.asset_identifier ?? operation.asset_identifier ?? operation.asset_id,
+    value: metadata.value ?? operation.value,
+    amount: metadata.amount ?? operation.amount,
+    sender: metadata.sender ?? operation.sender,
+    recipient: metadata.recipient ?? operation.recipient ?? operation.receiver,
+    address: metadata.address ?? operation.address,
+    hex_value: metadata.hex_value ?? metadata.hex ?? operation.hex_value ?? operation.hex,
+  };
+  return {
+    ...operation,
+    event_index: eventIndex,
+    event_type: eventType,
+    data,
+  };
+}
+
 function parseEvents(txId: string, indexBlockHash: string, rawTransaction: Record<string, unknown>): IngestedContractEvent[] {
   const metadata = object(rawTransaction.metadata);
   const receipt = object(metadata.receipt);
   const rawEvents = Array.isArray(receipt.events)
     ? receipt.events
-    : Array.isArray(metadata.events) ? metadata.events : [];
+    : Array.isArray(metadata.events)
+      ? metadata.events
+      : Array.isArray(rawTransaction.operations)
+        ? rawTransaction.operations.map(v2OperationEvent)
+        : [];
   return rawEvents.map((rawEvent, eventIndex) => {
     const event = object(rawEvent);
     const data = object(event.data);
@@ -167,7 +199,13 @@ export function parseChainhookPayload(
   input: unknown,
   options: { source?: string; network: "mainnet" | "testnet"; deliveryId?: string },
 ): ChainhookBatch {
-  const payload = chainhookPayloadSchema.parse(input);
+  const root = object(input);
+  const event = object(root.event);
+  const normalizedInput =
+    Array.isArray(event.apply) || Array.isArray(event.rollback)
+      ? { ...event, chainhook: root.chainhook }
+      : input;
+  const payload = chainhookPayloadSchema.parse(normalizedInput);
   if (payload.apply.length === 0 && payload.rollback.length === 0) throw new Error("Chainhook payload contains no apply or rollback blocks");
   const serialized = canonicalJson(input);
   const payloadSha256 = createHash("sha256").update(serialized).digest("hex");

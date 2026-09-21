@@ -27,6 +27,10 @@ domain restores the preferred httpOnly-cookie flow. Add every approved browser e
 ## 0. Preconditions
 
 - Local `.env` already has production-required keys (`HIRO_API_KEY`, `STACKS_REFERENCE_API_URL`, tokens, fingerprints).
+- `ADMIN_PASSWORD_SCRYPT`, `ANALYTICS_HASH_SALT`, and
+  `HIRO_CHAINHOOK_UUID` are configured as Fly secrets for the private
+  `/admin` monitoring console. Generate the password verifier with
+  `ADMIN_PASSWORD='...' npm run admin:hash-password`; never store the plaintext.
 - Signed registry `registry/mainnet/2026-09-13.1.signed.json` is the release in the Docker image.
 - Projection backfill can continue against Neon after cutover (`npm run backfill:registry-events:complete`).
 

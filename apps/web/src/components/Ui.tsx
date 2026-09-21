@@ -94,9 +94,11 @@ export function EmptyState({
 export function LoadingState() {
   return (
     <div className="loading-state" role="status">
-      <span />
-      <span />
-      <span />
+      <div className="loading-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
       <p>Resolving canonical positions and risk evidence…</p>
     </div>
   );

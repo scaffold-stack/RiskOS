@@ -11,6 +11,7 @@ The product is designed around one operating rule: **observe first, preserve the
 | Web application  | https://riskosfolio.pages.dev                       | Portfolio, risk, yield, alerts, reports, plans, and developer console  |
 | API              | https://riskosfolio-api.fly.dev                     | Versioned public, wallet-authenticated, and metered endpoints          |
 | Health           | https://riskosfolio-api.fly.dev/health              | Runtime mode, registry state, pricing boundary, and execution boundary |
+| Admin monitoring | https://riskosfolio.pages.dev/admin                  | Password-protected adoption, API, chain, backfill, database, and deployment telemetry |
 | Plans            | https://riskosfolio-api.fly.dev/v1/plans            | Current plan capabilities and enforceable quotas                       |
 | Yield strategies | https://riskosfolio-api.fly.dev/v1/yield/strategies | Evidence-derived strategy catalog                                      |
 
@@ -206,6 +207,14 @@ Goal: keep the production evidence system healthy.
 7. Verify price-source agreement and stale-evidence behavior.
 8. Check production health, plans, strategies, and protected endpoints after deployment.
 9. Preserve advisory-only mainnet execution until all execution gates are independently reviewed.
+
+The unlinked `/admin` route is protected by a salted server-side scrypt
+verifier and a short-lived tab session. It combines unique address searches,
+request/error/latency analytics, wallet and API-key activity, Chainhook state,
+canonical database counts, backfill checkpoints, registry state, deployment
+metadata, and recent privacy-preserving activity. Analytics begin when migration
+`009_admin_analytics.sql` is deployed; searches made before that point cannot be
+reconstructed.
 
 ## Developer journey
 

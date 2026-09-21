@@ -25,6 +25,7 @@ import { planRepay, planZestMainnetRepay } from "../../../packages/execution/src
 import { walletRequestForIntent } from "../../../packages/execution/src/index.js";
 import {
   BitcoinEsploraClient,
+  compactChainhookBatch,
   parseChainhookPayload,
   reconcileSbtcAddress,
   SbtcEmilyClient,
@@ -34,7 +35,7 @@ import {
   type RegistryStore,
   type StacksBlockReconciler,
 } from "../../../packages/data-foundation/src/index.js";
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   expiredSessionCookie,
   sessionCookie,
@@ -80,6 +81,13 @@ import {
   type CommercialStore,
   type PublicApiKey,
 } from "../../../packages/commercial/src/index.js";
+import {
+  AdminSessionService,
+  type AdminAnalyticsStore,
+  type AnalyticsActor,
+  type AnalyticsEventKind,
+  type AnalyticsWindow,
+} from "../../../packages/operations/src/index.js";
 
 export interface AppOptions {
   dataMode?: "fixture" | "live";
@@ -99,6 +107,7 @@ export interface AppOptions {
   bitflowAppApiUrl?: string;
   bitflowQuotesApiUrl?: string;
   hermeticaApiUrl?: string;
+  stackingDaoApiUrl?: string;
   defiLlamaYieldsApiUrl?: string;
   registryVerifier?: ContractRegistryVerifier;
   sbtcEmilyUrl?: string;
@@ -117,6 +126,11 @@ export interface AppOptions {
   yieldMarketProvider?: YieldMarketProvider;
   commercialStore?: CommercialStore;
   publicRateLimitPerMinute?: number;
+  chainhookBodyLimitBytes?: number;
+  adminPasswordVerifier?: string;
+  adminAnalyticsStore?: AdminAnalyticsStore;
+  analyticsHashSalt?: string;
+  hiroChainhookUuid?: string;
 }
 
 const actionPlanSchema = z.object({
@@ -166,6 +180,8 @@ const entitlementSchema = z.object({
   endsAt: z.string().datetime().nullable().optional(),
   source: z.enum(["manual", "billing"]).default("manual"),
 });
+const adminLoginSchema = z.object({ password: z.string().min(1).max(512) });
+const adminWindowSchema = z.enum(["24h", "7d", "30d"]).default("24h");
 
 function usdCents(value: string): bigint {
   const [whole, fraction = ""] = value.split(".");
@@ -204,9 +220,18 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   const productStore = options.productStore ?? new MemoryProductStore();
   const commercial = new CommercialService(options.commercialStore ?? new MemoryCommercialStore(), now);
   const commercialPrincipals = new WeakMap<object, { key: PublicApiKey; usage: ApiUsage }>();
+  const adminSessions = options.adminPasswordVerifier
+    ? new AdminSessionService(options.adminPasswordVerifier)
+    : null;
+  const adminLoginAttempts = new Map<string, { startedAt: number; count: number }>();
+  const requestStartedAt = new WeakMap<object, number>();
+  const processStartedAt = now();
   const publicRateLimitPerMinute = options.publicRateLimitPerMinute ?? 60;
+  const chainhookBodyLimitBytes = options.chainhookBodyLimitBytes ?? 32 * 1024 * 1024;
   if (!Number.isSafeInteger(publicRateLimitPerMinute) || publicRateLimitPerMinute < 1)
     throw new Error("publicRateLimitPerMinute must be a positive integer");
+  if (!Number.isSafeInteger(chainhookBodyLimitBytes) || chainhookBodyLimitBytes < 1024 * 1024)
+    throw new Error("chainhookBodyLimitBytes must be an integer of at least 1 MiB");
   const anonymousRateWindows = new Map<string, { startedAt: number; count: number }>();
   const auth = new WalletAuthService(
     productStore,
@@ -449,6 +474,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
             now,
             options.hermeticaApiUrl ?? "https://app.hermetica.fi",
             options.defiLlamaYieldsApiUrl ?? "https://yields.llama.fi/pools",
+            options.stackingDaoApiUrl ?? "https://app.stackingdao.com",
           ).discover());
   let yieldMarketCache: { expiresAt: number; markets: YieldMarket[] } | null = null;
   let yieldMarketLoad: Promise<YieldMarket[]> | null = null;
@@ -601,8 +627,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     return { tip, persisted, skipped };
   }
 
-  function bearerMatches(header: string | undefined, expected: string | undefined): boolean {
-    const supplied = header?.replace(/^Bearer\s+/i, "") ?? "";
+  function secretMatches(suppliedValue: string | undefined, expected: string | undefined): boolean {
+    const supplied = suppliedValue ?? "";
     const target = expected ?? "";
     return (
       supplied.length === target.length &&
@@ -611,10 +637,77 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     );
   }
 
+  function bearerMatches(header: string | undefined, expected: string | undefined): boolean {
+    return secretMatches(header?.replace(/^Bearer\s+/i, ""), expected);
+  }
+
+  function bearerToken(header: string | undefined): string | null {
+    const match = header?.match(/^Bearer\s+(.+)$/i);
+    return match?.[1]?.trim() || null;
+  }
+
+  function analyticsEventKind(
+    method: string,
+    route: string,
+    statusCode: number,
+  ): AnalyticsEventKind {
+    if (statusCode >= 400) return "api-request";
+    if (method === "GET" && route === "/v1/address/:address/overview") return "address-search";
+    if (method === "POST" && route === "/v1/auth/verify") return "wallet-login";
+    if (method === "POST" && route === "/v1/alerts/rules") return "alert-created";
+    if (method === "POST" && route === "/v1/account/api-keys") return "api-key-created";
+    if (method === "GET" && route === "/v1/reports/portfolio") return "report-generated";
+    if (method === "POST" && route === "/v1/actions/plan") return "protection-planned";
+    if (method === "POST" && route === "/v1/ingest/chainhooks/stacks")
+      return "chainhook-delivery";
+    if (method === "POST" && route === "/v1/admin/session") return "admin-login";
+    return "api-request";
+  }
+
+  function analyticsActor(request: {
+    url: string;
+    headers: Record<string, string | string[] | undefined>;
+  }): AnalyticsActor {
+    if (request.url.startsWith("/v1/ingest/chainhooks/")) return "chainhook";
+    if (request.url.startsWith("/v1/operations/")) return "operations";
+    if (request.url.startsWith("/v1/admin/")) return "admin";
+    if (typeof request.headers["x-api-key"] === "string") return "api-key";
+    if (typeof request.headers.authorization === "string") return "wallet";
+    return "anonymous";
+  }
+
+  function searchedAddressHash(
+    request: { params: unknown },
+    route: string,
+    statusCode: number,
+  ): string | null {
+    if (
+      route !== "/v1/address/:address/overview" ||
+      statusCode >= 400 ||
+      !options.analyticsHashSalt
+    )
+      return null;
+    const params =
+      request.params && typeof request.params === "object"
+        ? (request.params as Record<string, unknown>)
+        : {};
+    const address = typeof params.address === "string" ? params.address : null;
+    return address
+      ? createHmac("sha256", options.analyticsHashSalt).update(address).digest("hex")
+      : null;
+  }
+
   await app.register(cors, {
     origin: process.env.WEB_ORIGIN?.split(",") ?? ["http://localhost:5173"],
     methods: ["GET", "POST"],
-    allowedHeaders: ["content-type", "authorization", "x-api-key", "x-riskos-sdk-version"],
+    allowedHeaders: [
+      "content-type",
+      "authorization",
+      "x-api-key",
+      "x-riskos-sdk-version",
+      "x-chainhook-consumer-secret",
+      "x-chainhook-delivery",
+    ],
     credentials: true,
   });
 
@@ -625,6 +718,39 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     reply.header("referrer-policy", "no-referrer");
     reply.header("cache-control", "no-store");
     return payload;
+  });
+
+  app.addHook("onRequest", async (request) => {
+    requestStartedAt.set(request, performance.now());
+  });
+
+  app.addHook("onResponse", async (request, reply) => {
+    if (
+      !options.adminAnalyticsStore ||
+      request.url === "/health" ||
+      request.url.startsWith("/v1/admin/overview")
+    )
+      return;
+    const route = String(request.routeOptions.url ?? request.url.split("?", 1)[0] ?? request.url);
+    const principal = commercialPrincipals.get(request);
+    const event = {
+      requestId: `${process.pid}:${request.id}`,
+      method: request.method,
+      route,
+      statusCode: reply.statusCode,
+      durationMs: Math.max(
+        0,
+        Math.round(performance.now() - (requestStartedAt.get(request) ?? performance.now())),
+      ),
+      actorKind: analyticsActor(request),
+      apiKeyId: principal?.key.keyId ?? null,
+      addressHash: searchedAddressHash(request, route, reply.statusCode),
+      eventKind: analyticsEventKind(request.method, route, reply.statusCode),
+      occurredAt: now().toISOString(),
+    };
+    void options.adminAnalyticsStore.recordRequest(event).catch((error: unknown) => {
+      request.log.error({ error }, "Unable to persist request analytics");
+    });
   });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -1212,52 +1338,300 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     return reply.code(204).send();
   });
 
-  app.post("/v1/ingest/chainhooks/stacks", async (request, reply) => {
-    if (!options.dataFoundation) {
+  app.post(
+    "/v1/ingest/chainhooks/stacks",
+    {
+      bodyLimit: chainhookBodyLimitBytes,
+      onRequest: async (request, reply) => {
+        if (!options.dataFoundation) {
+          return reply
+            .code(503)
+            .send(
+              problem(
+                503,
+                "INGESTION_UNAVAILABLE",
+                "Ingestion unavailable",
+                "The canonical event store is not configured.",
+              ),
+            );
+        }
+        const consumerSecret =
+          typeof request.headers["x-chainhook-consumer-secret"] === "string"
+            ? request.headers["x-chainhook-consumer-secret"]
+            : undefined;
+        if (
+          !bearerMatches(request.headers.authorization, options.chainhookBearerToken) &&
+          !secretMatches(consumerSecret, options.chainhookBearerToken)
+        ) {
+          return reply
+            .code(401)
+            .send(
+              problem(
+                401,
+                "INGESTION_UNAUTHORIZED",
+                "Unauthorized",
+                "A valid Chainhook bearer token is required.",
+              ),
+            );
+        }
+      },
+    },
+    async (request, reply) => {
+      try {
+        const parsedBatch = parseChainhookPayload(request.body, {
+          network,
+          ...(typeof request.headers["x-chainhook-delivery"] === "string"
+            ? { deliveryId: request.headers["x-chainhook-delivery"] }
+            : {}),
+        });
+        const manifest = await activeManifest();
+        const batch = compactChainhookBatch(parsedBatch, manifest);
+        const result = await options.dataFoundation!.ingest(batch, manifest);
+        return reply.code(result.duplicate ? 200 : 202).send(result);
+      } catch (error) {
+        return reply
+          .code(400)
+          .send(
+            problem(
+              400,
+              "INVALID_CHAINHOOK_PAYLOAD",
+              "Invalid Chainhook payload",
+              error instanceof Error ? error.message : "Payload rejected",
+            ),
+          );
+      }
+    },
+  );
+
+  app.post("/v1/admin/session", async (request, reply) => {
+    if (!adminSessions || !options.adminAnalyticsStore) {
       return reply
         .code(503)
         .send(
           problem(
             503,
-            "INGESTION_UNAVAILABLE",
-            "Ingestion unavailable",
-            "The canonical event store is not configured.",
+            "ADMIN_UNAVAILABLE",
+            "Admin console unavailable",
+            "Admin authentication and analytics storage are not configured.",
           ),
         );
     }
-    if (!bearerMatches(request.headers.authorization, options.chainhookBearerToken)) {
+    const parsed = adminLoginSchema.safeParse(request.body);
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send(problem(400, "ADMIN_LOGIN_INVALID", "Invalid login", "A password is required."));
+    const at = now();
+    const windowMilliseconds = 15 * 60 * 1_000;
+    const previous = adminLoginAttempts.get(request.ip);
+    const attempts =
+      !previous || at.getTime() - previous.startedAt >= windowMilliseconds
+        ? { startedAt: at.getTime(), count: 0 }
+        : previous;
+    if (attempts.count >= 5) {
+      const retryAt = attempts.startedAt + windowMilliseconds;
+      reply.header("retry-after", Math.max(1, Math.ceil((retryAt - at.getTime()) / 1_000)));
+      return reply
+        .code(429)
+        .send(
+          problem(
+            429,
+            "ADMIN_LOGIN_RATE_LIMITED",
+            "Too many login attempts",
+            "Wait before trying the admin password again.",
+          ),
+        );
+    }
+    const session = await adminSessions.login(parsed.data.password, at);
+    if (!session) {
+      adminLoginAttempts.set(request.ip, { ...attempts, count: attempts.count + 1 });
       return reply
         .code(401)
         .send(
           problem(
             401,
-            "INGESTION_UNAUTHORIZED",
-            "Unauthorized",
-            "A valid Chainhook bearer token is required.",
+            "ADMIN_LOGIN_FAILED",
+            "Access denied",
+            "The supplied admin password is invalid.",
           ),
         );
     }
-    try {
-      const batch = parseChainhookPayload(request.body, {
-        network,
-        ...(typeof request.headers["x-chainhook-delivery"] === "string"
-          ? { deliveryId: request.headers["x-chainhook-delivery"] }
-          : {}),
-      });
-      const result = await options.dataFoundation.ingest(batch, await activeManifest());
-      return reply.code(result.duplicate ? 200 : 202).send(result);
-    } catch (error) {
+    adminLoginAttempts.delete(request.ip);
+    return session;
+  });
+
+  app.post("/v1/admin/logout", async (request, reply) => {
+    if (!adminSessions?.authenticate(bearerToken(request.headers.authorization), now()))
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "ADMIN_SESSION_REQUIRED",
+            "Admin session required",
+            "Sign in to the operations console before continuing.",
+          ),
+        );
+    adminSessions.logout(bearerToken(request.headers.authorization));
+    return reply.code(204).send();
+  });
+
+  app.get<{ Querystring: { window?: string } }>("/v1/admin/overview", async (request, reply) => {
+    if (
+      !adminSessions?.authenticate(bearerToken(request.headers.authorization), now()) ||
+      !options.adminAnalyticsStore
+    )
+      return reply
+        .code(401)
+        .send(
+          problem(
+            401,
+            "ADMIN_SESSION_REQUIRED",
+            "Admin session required",
+            "Sign in to the operations console before continuing.",
+          ),
+        );
+    const parsedWindow = adminWindowSchema.safeParse(request.query.window);
+    if (!parsedWindow.success)
       return reply
         .code(400)
         .send(
           problem(
             400,
-            "INVALID_CHAINHOOK_PAYLOAD",
-            "Invalid Chainhook payload",
-            error instanceof Error ? error.message : "Payload rejected",
+            "ADMIN_WINDOW_INVALID",
+            "Invalid analytics window",
+            "Use 24h, 7d, or 30d.",
           ),
         );
+    const at = now();
+    const [analytics, sources, canonicalTip] = await Promise.all([
+      options.adminAnalyticsStore.snapshot(parsedWindow.data as AnalyticsWindow, at),
+      options.dataFoundation?.sourceHealth() ?? Promise.resolve([]),
+      options.dataFoundation?.canonicalTip(network) ?? Promise.resolve(null),
+    ]);
+    let chainhook: {
+      uuid: string;
+      state: string;
+      enabled: boolean;
+      occurrenceCount: number;
+      lastBlock: number | null;
+      lastEvaluatedAt: string | null;
+      error: string | null;
+    } | null = null;
+    if (options.hiroChainhookUuid && options.hiroApiKey) {
+      try {
+        const response = await fetch(
+          `https://api.mainnet.hiro.so/chainhooks/v1/me/${options.hiroChainhookUuid}`,
+          {
+            headers: { "x-api-key": options.hiroApiKey, accept: "application/json" },
+            signal: AbortSignal.timeout(10_000),
+          },
+        );
+        if (!response.ok) throw new Error(`Hiro returned HTTP ${response.status}`);
+        const payload = (await response.json()) as {
+          status?: {
+            status?: string;
+            enabled?: boolean;
+            occurrence_count?: number;
+            last_occurrence_block_height?: number | null;
+            last_evaluated_at?: number | null;
+          };
+        };
+        chainhook = {
+          uuid: options.hiroChainhookUuid,
+          state: payload.status?.status ?? "unknown",
+          enabled: payload.status?.enabled === true,
+          occurrenceCount: payload.status?.occurrence_count ?? 0,
+          lastBlock: payload.status?.last_occurrence_block_height ?? null,
+          lastEvaluatedAt: payload.status?.last_evaluated_at
+            ? new Date(payload.status.last_evaluated_at).toISOString()
+            : null,
+          error: null,
+        };
+      } catch (error) {
+        chainhook = {
+          uuid: options.hiroChainhookUuid,
+          state: "unavailable",
+          enabled: false,
+          occurrenceCount: 0,
+          lastBlock: null,
+          lastEvaluatedAt: null,
+          error: error instanceof Error ? error.message : "Unable to read Hiro Chainhook status",
+        };
+      }
     }
+    const sourceBroken = sources.some((source) => source.state === "red");
+    const sourceDegraded = sources.some((source) => source.state === "amber");
+    const backfillBroken = analytics.backfills.some((checkpoint) => checkpoint.status === "failed");
+    const backfillDegraded =
+      analytics.backfills.length === 0 ||
+      analytics.backfills.some((checkpoint) => checkpoint.status !== "complete");
+    const chainhookHealthy = chainhook?.enabled === true && chainhook.state === "streaming";
+    const overallState =
+      sourceBroken || backfillBroken || chainhook?.state === "interrupted"
+        ? "broken"
+        : sourceDegraded || backfillDegraded || !chainhookHealthy
+          ? "degraded"
+          : "live";
+    return {
+      ...analytics,
+      overallState,
+      api: {
+        status: "ok",
+        dataMode,
+        network,
+        registryMode: options.registryMode ?? "none",
+        uptimeSeconds: Math.round(process.uptime()),
+        startedAt: processStartedAt.toISOString(),
+        nodeVersion: process.version,
+      },
+      deployment: {
+        provider: process.env.FLY_APP_NAME ? "fly.io" : "local",
+        app: process.env.FLY_APP_NAME ?? null,
+        machineId: process.env.FLY_MACHINE_ID ?? null,
+        region: process.env.FLY_REGION ?? null,
+        imageRef: process.env.FLY_IMAGE_REF ?? null,
+        releaseId: process.env.FLY_RELEASE_ID ?? null,
+      },
+      chain: {
+        canonicalTip,
+        sources,
+        chainhook,
+      },
+      modules: [
+        { name: "API", state: "live", detail: `${dataMode} · ${network}` },
+        {
+          name: "Chain ingestion",
+          state: chainhookHealthy ? "live" : chainhook ? "broken" : "degraded",
+          detail: chainhook
+            ? `${chainhook.state} · block ${chainhook.lastBlock?.toLocaleString() ?? "unknown"}`
+            : "Hiro Chainhook status is not configured",
+        },
+        {
+          name: "Canonical database",
+          state: analytics.database.state === "healthy" ? "live" : "broken",
+          detail: `${analytics.database.canonicalBlocks.toLocaleString()} canonical blocks`,
+        },
+        {
+          name: "Signed registry",
+          state: analytics.registry.state === "active" ? "live" : "degraded",
+          detail: analytics.registry.activeVersion ?? "No active registry",
+        },
+        {
+          name: "Historical backfill",
+          state: backfillBroken
+            ? "broken"
+            : analytics.backfills.length > 0 &&
+                analytics.backfills.every((checkpoint) => checkpoint.status === "complete")
+              ? "live"
+              : "degraded",
+          detail:
+            analytics.backfills.length > 0
+              ? `${analytics.backfills.filter((checkpoint) => checkpoint.status === "complete").length}/${analytics.backfills.length} complete`
+              : "No production backfill checkpoints",
+        },
+      ],
+    };
   });
 
   app.get("/v1/system/health", async () => ({

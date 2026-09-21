@@ -407,3 +407,179 @@ export function recordSubmission(intentId: string, txid: string) {
     { method: "POST", body: JSON.stringify({ txid }) },
   );
 }
+
+export type AdminWindow = "24h" | "7d" | "30d";
+export interface AdminOverview {
+  window: AdminWindow;
+  generatedAt: string;
+  overallState: "live" | "degraded" | "broken";
+  traffic: {
+    requests: number;
+    errors: number;
+    errorRatePercent: number;
+    averageLatencyMs: number;
+    p95LatencyMs: number;
+    addressSearches: number;
+    uniqueAddresses: number;
+    walletLogins: number;
+  };
+  workflows: {
+    alertsCreated: number;
+    reportsGenerated: number;
+    apiKeysCreated: number;
+    protectionPlans: number;
+    activeWalletSessions: number;
+    activeApiKeys: number;
+    monthlyApiKeyRequests: number;
+  };
+  database: {
+    state: "healthy";
+    sizeBytes: number;
+    activeConnections: number;
+    transactionsCommitted: number;
+    canonicalBlocks: number;
+    canonicalTransactions: number;
+    canonicalContractEvents: number;
+    canonicalProjections: number;
+    projectionIssues: number;
+  };
+  registry: { activeVersion: string | null; state: string; activatedAt: string | null };
+  endpoints: Array<{
+    route: string;
+    requests: number;
+    errors: number;
+    averageLatencyMs: number;
+    p95LatencyMs: number;
+  }>;
+  timeline: Array<{ hour: string; requests: number; errors: number; searches: number }>;
+  backfills: Array<{
+    contractPrincipal: string;
+    status: string;
+    nextOffset: number;
+    observedTip: number | null;
+    pagesCompleted: number;
+    eventsSeen: number;
+    transactionsIngested: number;
+    lastError: string | null;
+    updatedAt: string;
+  }>;
+  recentActivity: Array<{
+    occurredAt: string;
+    eventKind: string;
+    route: string;
+    method: string;
+    statusCode: number;
+    durationMs: number;
+    actorKind: string;
+  }>;
+  api: {
+    status: string;
+    dataMode: string;
+    network: string;
+    registryMode: string;
+    uptimeSeconds: number;
+    startedAt: string;
+    nodeVersion: string;
+  };
+  deployment: {
+    provider: string;
+    app: string | null;
+    machineId: string | null;
+    region: string | null;
+    imageRef: string | null;
+    releaseId: string | null;
+  };
+  chain: {
+    canonicalTip: {
+      network: string;
+      indexBlockHash: string;
+      height: number;
+      canonical: boolean;
+      burnBlockHeight: number | null;
+    } | null;
+    sources: Array<{
+      sourceId: string;
+      state: "green" | "amber" | "red";
+      observedHeight: number | null;
+      lagBlocks: number | null;
+      detail: string | null;
+    }>;
+    chainhook: {
+      uuid: string;
+      state: string;
+      enabled: boolean;
+      occurrenceCount: number;
+      lastBlock: number | null;
+      lastEvaluatedAt: string | null;
+      error: string | null;
+    } | null;
+  };
+  modules: Array<{ name: string; state: "live" | "degraded" | "broken"; detail: string }>;
+}
+
+const ADMIN_SESSION_STORAGE_KEY = "riskosfolio:admin-session:v1";
+let adminSessionToken = (() => {
+  try {
+    return browserSessionStorage()?.getItem(ADMIN_SESSION_STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: "omit",
+    headers: {
+      ...(init?.body ? { "content-type": "application/json" } : {}),
+      ...(adminSessionToken ? { authorization: `Bearer ${adminSessionToken}` } : {}),
+      ...init?.headers,
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 401) {
+      adminSessionToken = null;
+      browserSessionStorage()?.removeItem(ADMIN_SESSION_STORAGE_KEY);
+    }
+    throw new Error(
+      typeof payload.detail === "string"
+        ? payload.detail
+        : typeof payload.title === "string"
+          ? payload.title
+          : "Admin request failed",
+    );
+  }
+  return payload as T;
+}
+
+export function hasAdminSession(): boolean {
+  return Boolean(adminSessionToken);
+}
+
+export async function createAdminSession(password: string) {
+  const session = await adminRequest<{ token: string; expiresAt: string }>("/v1/admin/session", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+  adminSessionToken = session.token;
+  browserSessionStorage()?.setItem(ADMIN_SESSION_STORAGE_KEY, session.token);
+  return session;
+}
+
+export function getAdminOverview(window: AdminWindow) {
+  return adminRequest<AdminOverview>(`/v1/admin/overview?window=${window}`);
+}
+
+export async function logoutAdminSession(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/v1/admin/logout`, {
+      method: "POST",
+      credentials: "omit",
+      headers: adminSessionToken ? { authorization: `Bearer ${adminSessionToken}` } : {},
+    });
+  } finally {
+    adminSessionToken = null;
+    browserSessionStorage()?.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  }
+}

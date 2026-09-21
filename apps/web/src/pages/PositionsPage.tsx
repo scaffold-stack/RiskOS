@@ -61,7 +61,7 @@ export function PositionsPage({
     null;
 
   if (!envelope) {
-    return (
+  return (
       <div className="page-state-stage">
         <EmptyState
           title="No portfolio loaded"
@@ -162,17 +162,17 @@ export function PositionsPage({
 
       <div className="pos-tabs" role="tablist" aria-label="Position filters">
         {(["all", "lending", "liquidity", "wallet"] as TypeFilter[]).map((item) => (
-          <button
-            key={item}
+              <button
+                key={item}
             className={typeFilter === item ? "active" : ""}
             onClick={() => setTypeFilter(item)}
-            role="tab"
+                role="tab"
             aria-selected={typeFilter === item}
-          >
+              >
             {item === "all" ? "All positions" : titleCase(item)}
-          </button>
-        ))}
-      </div>
+              </button>
+            ))}
+          </div>
 
       <section className="pos-summary-strip" aria-label="Position summary">
         <SummaryCell label={positionSummaryLabel} value={formatUsd(positionSummaryValue)} />
@@ -261,23 +261,23 @@ export function PositionsPage({
           {visible.length ? (
             <div className="pos-table-wrap">
               <table className="pos-table">
-                <thead>
-                  <tr>
-                    <th>Position</th>
+                  <thead>
+                    <tr>
+                      <th>Position</th>
                     <th>Protocol / type</th>
                     <th>Balance</th>
                     <th>Debt / earnings</th>
                     <th>USD value</th>
                     <th>Capital state</th>
-                    <th>Risk</th>
+                      <th>Risk</th>
                     <th>Data quality</th>
                     <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((position) => {
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((position) => {
                     const risk = risks.find((item) => item.positionId === position.id);
-                    return (
+                      return (
                       <tr
                         key={position.id}
                         className={selected?.id === position.id ? "selected" : ""}
@@ -293,8 +293,8 @@ export function PositionsPage({
                               <strong>{protocolName(position)}</strong>
                               <small>{titleCase(position.type)}</small>
                             </span>
-                          </div>
-                        </td>
+                            </div>
+                          </td>
                         <td className="mono pos-col-balance" title={positionBalance(position, false)}>
                           <span>{positionBalance(position)}</span>
                         </td>
@@ -302,24 +302,24 @@ export function PositionsPage({
                         <td className="mono">{positionUsdDisplay(position)}</td>
                         <td className="pos-col-state">
                           <StatusChip tone="healthy">{capitalState(position)}</StatusChip>
-                        </td>
-                        <td>
+                          </td>
+                          <td>
                           <StatusChip tone={severityTone(risk?.severity)}>
                             {titleCase(risk?.severity ?? "low")}
-                          </StatusChip>
-                        </td>
-                        <td>
+                            </StatusChip>
+                          </td>
+                          <td>
                           <StatusChip tone={qualityTone(position)}>
                             {titleCase(position.confidence.state)}
                           </StatusChip>
-                        </td>
+                          </td>
                         <td>•••</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
           ) : (
             <p className="pos-empty">No positions match the selected filters.</p>
           )}
@@ -464,8 +464,8 @@ function EvidenceFooter({ position }: { position: Position }) {
                 confidence
               </small>
             </p>
-          ))}
-        </div>
+              ))}
+            </div>
       ) : (
         <div className="pos-valuation-evidence unavailable">
           <strong>{position.confidence.state === "unsupported" ? "USD valuation unsupported" : "USD valuation unavailable"}</strong>

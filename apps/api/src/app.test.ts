@@ -5,6 +5,10 @@ import { buildApp } from "./app.js";
 import { MemoryDataFoundationStore } from "../../../packages/data-foundation/src/index.js";
 import type { RegistryStore, SignedRegistry } from "../../../packages/data-foundation/src/index.js";
 import type { ProtocolAdapter } from "../../../packages/domain/src/index.js";
+import {
+  MemoryAdminAnalyticsStore,
+  createAdminPasswordVerifier,
+} from "../../../packages/operations/src/index.js";
 
 describe("RiskOS API integration", () => {
   let app: FastifyInstance | undefined;
@@ -713,6 +717,86 @@ describe("RiskOS API integration", () => {
     });
     expect(duplicate.statusCode).toBe(200);
     expect(duplicate.json()).toMatchObject({ duplicate: true, appliedBlocks: 0 });
+
+    const v2Accepted = await app.inject({
+      method: "POST",
+      url: "/v1/ingest/chainhooks/stacks",
+      headers: {
+        "x-chainhook-consumer-secret": "test-token-that-is-at-least-32-characters",
+        "x-chainhook-delivery": "delivery-201",
+      },
+      payload: {
+        event: {
+          chain: "stacks",
+          network: "testnet",
+          rollback: [],
+          apply: [{
+            block_identifier: { index: 201, hash: "block-201" },
+            parent_block_identifier: { index: 200, hash: "block-200" },
+            metadata: { index_block_hash: "index-201" },
+            transactions: [],
+          }],
+        },
+        chainhook: { uuid: "riskos-events-v2" },
+        padding: "x".repeat(1_100_000),
+      },
+    });
+    expect(v2Accepted.statusCode).toBe(202);
+    expect(v2Accepted.json()).toMatchObject({
+      duplicate: false,
+      appliedBlocks: 1,
+      checkpointHeight: 201,
+    });
+  });
+
+  it("protects the unified admin board and records address-search analytics", async () => {
+    const analytics = new MemoryAdminAnalyticsStore();
+    app = await buildApp({
+      dataMode: "fixture",
+      dataFoundation: new MemoryDataFoundationStore(),
+      adminAnalyticsStore: analytics,
+      analyticsHashSalt: "analytics-test-salt-that-is-at-least-32-characters",
+      adminPasswordVerifier: await createAdminPasswordVerifier("khenneryzy4real"),
+      network: "testnet",
+    });
+
+    const denied = await app.inject({ method: "GET", url: "/v1/admin/overview" });
+    expect(denied.statusCode).toBe(401);
+    const wrongPassword = await app.inject({
+      method: "POST",
+      url: "/v1/admin/session",
+      payload: { password: "not-the-password" },
+    });
+    expect(wrongPassword.statusCode).toBe(401);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/v1/admin/session",
+      payload: { password: "khenneryzy4real" },
+    });
+    expect(login.statusCode).toBe(200);
+    const token = String(login.json().token);
+
+    const search = await app.inject({
+      method: "GET",
+      url: `/v1/address/${DEMO_ADDRESS}/overview`,
+    });
+    expect(search.statusCode).toBe(200);
+
+    const overview = await app.inject({
+      method: "GET",
+      url: "/v1/admin/overview?window=24h",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(overview.statusCode).toBe(200);
+    expect(overview.json()).toMatchObject({
+      overallState: "degraded",
+      traffic: { addressSearches: 1, uniqueAddresses: 1 },
+      api: { status: "ok", dataMode: "fixture", network: "testnet" },
+    });
+    expect(overview.json().recentActivity).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ route: "/v1/admin/overview" })]),
+    );
   });
 
   it("persists fixture positions only against the exact canonical index-block hash", async () => {

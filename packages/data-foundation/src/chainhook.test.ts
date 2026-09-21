@@ -44,6 +44,22 @@ describe("Chainhook ingestion", () => {
     expect(() => parseChainhookPayload({}, { network: "mainnet" })).toThrow(/no apply or rollback/);
   });
 
+  it("derives content-addressed event keys for replayable backfills", async () => {
+    const store = new MemoryDataFoundationStore();
+    const first = parseChainhookPayload(
+      { apply: [block(201, "first", "parent")], rollback: [] },
+      { network: "mainnet", source: "registry-backfill:test" },
+    );
+    const changed = parseChainhookPayload(
+      { apply: [block(202, "changed", "first")], rollback: [] },
+      { network: "mainnet", source: "registry-backfill:test" },
+    );
+    expect(first.eventKey).not.toBe(changed.eventKey);
+    await expect(store.ingest(first)).resolves.toMatchObject({ duplicate: false });
+    await expect(store.ingest(first)).resolves.toMatchObject({ duplicate: true });
+    await expect(store.ingest(changed)).resolves.toMatchObject({ duplicate: false });
+  });
+
   it("normalizes Hiro extended API contract events without losing their canonical event index", () => {
     const payload = {
       rollback: [],
@@ -94,5 +110,75 @@ describe("Chainhook ingestion", () => {
         recipient: "SP000000000000000000002Q6VF78.pox-5", amount: "54544",
       } },
     });
+  });
+
+  it("normalizes Chainhooks v2 event envelopes and transaction operations", () => {
+    const payload = {
+      event: {
+        chain: "stacks",
+        network: "mainnet",
+        rollback: [],
+        apply: [{
+          block_identifier: { index: 9_032_400, hash: "block-v2" },
+          parent_block_identifier: { index: 9_032_399, hash: "parent-v2" },
+          timestamp: 1_789_910_400,
+          metadata: { index_block_hash: "index-v2", burn_block_height: 966_500 },
+          transactions: [{
+            transaction_identifier: { hash: "0xv2" },
+            metadata: { position: 3, success: true },
+            operations: [
+              {
+                type: "contract_log",
+                operation_identifier: { index: 4 },
+                metadata: {
+                  contract_identifier: "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-8-market",
+                  topic: "print",
+                  value: "0x00",
+                },
+              },
+              {
+                type: "ft_mint",
+                operation_identifier: { index: 5 },
+                metadata: {
+                  asset_identifier: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token",
+                  amount: "54544",
+                  recipient: "SP000000000000000000002Q6VF78",
+                },
+              },
+            ],
+          }],
+        }],
+      },
+      chainhook: { uuid: "riskos-v2", name: "RiskOSfolio mainnet" },
+    };
+
+    const batch = parseChainhookPayload(payload, { network: "mainnet" });
+    expect(batch.source).toBe("hiro-chainhooks:riskos-v2");
+    expect(batch.apply[0]).toMatchObject({
+      height: 9_032_400,
+      indexBlockHash: "index-v2",
+      parentIndexBlockHash: "parent-v2",
+      burnBlockHeight: 966_500,
+    });
+    expect(batch.apply[0]?.transactions[0]?.events).toMatchObject([
+      {
+        eventIndex: 4,
+        eventType: "contract_log",
+        contractIdentifier: "SP1A27KFY4XERQCCRCARCYD1CC5N7M6688BSYADJ7.v0-8-market",
+        topic: "print",
+        value: { data: { value: "0x00" } },
+      },
+      {
+        eventIndex: 5,
+        eventType: "ft_mint",
+        value: {
+          data: {
+            asset_identifier: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token::sbtc-token",
+            amount: "54544",
+            recipient: "SP000000000000000000002Q6VF78",
+          },
+        },
+      },
+    ]);
   });
 });

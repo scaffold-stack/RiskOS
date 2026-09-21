@@ -13,6 +13,38 @@ This implementation follows the supplied blueprint's requirements for an event-d
 7. Apply blocks atomically replace any competing canonical block at the same height.
 8. The source checkpoint and source-health record update in the same database transaction.
 
+## Continuous mainnet ingestion
+
+The production hook is versioned at
+`infra/chainhooks/mainnet-riskosfolio.json`. It uses Hiro Chainhooks v2 and is
+intentionally registered disabled first. The consumer accepts both the current
+v2 `{ event: { apply, rollback }, chainhook }` envelope and the legacy
+top-level envelope, and normalizes v2 transaction operations before projection.
+
+Hiro's consumer secret must be stored as the Fly
+`CHAINHOOK_BEARER_TOKEN`; deliveries authenticated by either
+`Authorization: Bearer <secret>` or `x-chainhook-consumer-secret: <secret>` are
+accepted. Authentication runs before body parsing. The ingestion route has a
+bounded 32 MiB default (`CHAINHOOK_BODY_LIMIT_BYTES`) because v2 payloads for
+busy blocks can exceed Fastify's 1 MiB default without making that larger limit
+global to public API routes. Enable the hook only after the API containing the
+matching parser and secret has been deployed. The historical backfill remains a separate,
+finite/replayable process; the enabled hook owns forward apply/rollback
+delivery.
+
+The production predicate is deliberately narrow: one coinbase event preserves
+forward canonical block progress, while registry-scoped contract logs and
+sBTC/Bitflow asset events capture projection inputs. Do not restore unscoped
+`contract_call`, `contract_log`, `ft_event`, or `nft_event` filters. A broad
+predicate filled the free Neon database with unrelated transaction/event data
+without creating protocol projections.
+
+Before persistence, the consumer also compacts each delivery: it keeps the
+canonical block identity, the original payload SHA-256, and only registry-scoped
+projection events. Unrelated full-block transaction operations are discarded,
+and `raw_chain_events.payload` stores a deterministic delivery summary rather
+than duplicating the full webhook body.
+
 ## Canonical projections and snapshots
 
 - Zest ownership and amount changes come from the registry-approved `v0-market-vault` print schema.

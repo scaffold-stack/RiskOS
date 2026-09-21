@@ -1,7 +1,12 @@
 import { Cl, serializeCV } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
-import type { IngestedBlock, IngestedContractEvent } from "./chainhook.js";
-import { isProjectionBackfillContract, projectionBackfillContracts, projectProtocolEvents } from "./protocol-projection.js";
+import type { ChainhookBatch, IngestedBlock, IngestedContractEvent } from "./chainhook.js";
+import {
+  compactChainhookBatch,
+  isProjectionBackfillContract,
+  projectionBackfillContracts,
+  projectProtocolEvents,
+} from "./protocol-projection.js";
 import type { RegistryManifest } from "./registry.js";
 
 const owner = "SP000000000000000000002Q6VF78";
@@ -159,5 +164,40 @@ describe("protocol event projection", () => {
       sbtcRegistry,
     ]);
     expect(isProjectionBackfillContract(token)).toBe(false);
+  });
+
+  it("compacts full-block deliveries to projection inputs before persistence", () => {
+    const relevant = print("event-0", zestContract, Cl.tuple({
+      action: Cl.stringAscii("collateral-add"),
+      data: Cl.tuple({ account: Cl.standardPrincipal(owner), amount: Cl.uint(1), "asset-id": Cl.uint(5) }),
+    }));
+    const irrelevant: IngestedContractEvent = {
+      eventKey: "event-1",
+      eventIndex: 1,
+      eventType: "ft_transfer",
+      contractIdentifier: zestContract,
+      topic: null,
+      value: { data: { asset_identifier: "SP000000000000000000002Q6VF78.unrelated::token" } },
+    };
+    const batch: ChainhookBatch = {
+      eventKey: "delivery-1",
+      payloadSha256: "f".repeat(64),
+      source: "hiro-chainhooks:test",
+      network: "mainnet",
+      payload: { large: "payload" },
+      apply: [block([relevant, irrelevant])],
+      rollback: [],
+    };
+    const compacted = compactChainhookBatch(batch, manifest);
+    expect(compacted.payloadSha256).toBe(batch.payloadSha256);
+    expect(compacted.payload).toMatchObject({
+      compacted: true,
+      originalPayloadSha256: batch.payloadSha256,
+      apply: [{ retainedTransactions: 1, retainedEvents: 1 }],
+    });
+    expect(compacted.apply[0]?.transactions[0]).toMatchObject({
+      raw: { compacted: true, retainedEventCount: 1 },
+      events: [{ eventKey: "event-0" }],
+    });
   });
 });

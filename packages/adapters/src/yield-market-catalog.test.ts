@@ -236,6 +236,153 @@ describe("yield market catalog", () => {
     }));
   });
 
+  it("ingests StackingDAO projected APYs from the official app endpoint", async () => {
+    const stackingManifest: RegistryManifest = {
+      ...manifest,
+      entries: [
+        {
+          ...manifest.entries[0]!,
+          protocol: "stackingdao",
+          contractPrincipal: "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token",
+          supportedAssets: ["stSTX"],
+        },
+        {
+          ...manifest.entries[0]!,
+          protocol: "stackingdao",
+          contractPrincipal: "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token-v2",
+          supportedAssets: ["stSTXbtc"],
+        },
+        {
+          ...manifest.entries[0]!,
+          protocol: "stackingdao",
+          contractPrincipal: "SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.stbtc-token",
+          supportedAssets: ["stBTC"],
+        },
+      ],
+    };
+    const request = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/apy?v=2")) {
+        return new Response(JSON.stringify({ ststx: 4.01, ststxbtc: 4.5, stx: 5.1, stbtc: 2.48 }), { status: 200 });
+      }
+      if (url.endsWith("/api/protocol-stats")) {
+        return new Response(JSON.stringify({
+          stStxSupply: 45_145_295.73,
+          stStxBtcSupply: 27_798_456.76,
+          stBtcSupply: 152.49,
+        }), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    const catalog = new MainnetYieldMarketCatalog(
+      async () => stackingManifest,
+      new StacksReadOnlyClient("https://stacks.invalid"),
+      "https://bitflow.invalid",
+      request,
+      () => new Date("2026-09-15T08:00:00.000Z"),
+      "https://hermetica.invalid",
+      "https://yields.invalid/pools",
+      "https://app.stackingdao.com",
+    );
+
+    const markets = await catalog.discover();
+    expect(markets).toContainEqual(expect.objectContaining({
+      id: "stackingdao:ststx",
+      protocol: "stackingdao",
+      assets: "stSTX",
+      annualizedRateBps: 401,
+      rateLabel: "Reward APY",
+      evidenceState: "provider-reported",
+      eligibleForAllocation: false,
+      source: "https://app.stackingdao.com/api/apy?v=2",
+      meaning: expect.stringContaining("projected"),
+    }));
+    expect(markets).toContainEqual(expect.objectContaining({
+      id: "stackingdao:ststxbtc",
+      annualizedRateBps: 450,
+    }));
+    expect(markets).toContainEqual(expect.objectContaining({
+      id: "stackingdao:stbtc",
+      annualizedRateBps: 248,
+    }));
+    expect(markets.some((market) => market.id === "coverage:stackingdao")).toBe(false);
+  });
+
+  it("reconstructs Granite supply APR from the official IR module at a pinned tip", async () => {
+    const state = "SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.state-v1";
+    const graniteManifest: RegistryManifest = {
+      ...manifest,
+      entries: [{
+        ...manifest.entries[0]!,
+        protocol: "granite",
+        contractPrincipal: state,
+        supportedAssets: ["gUSDC", "aeUSDC", "sBTC"],
+        readOnlyFunctions: ["get-lp-params", "get-debt-params", "get-protocol-reserve-percentage"],
+      }],
+    };
+    const tipHash = `0x${"c".repeat(64)}`;
+    const request = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/extended/v2/blocks?limit=1")) {
+        return new Response(JSON.stringify({
+          results: [{ canonical: true, height: 9_100_000, index_block_hash: tipHash }],
+        }), { status: 200 });
+      }
+      if (url.includes("/get-lp-params")) {
+        return new Response(JSON.stringify({
+          okay: true,
+          result: cvToHex(Cl.tuple({
+            "total-assets": Cl.uint(97_730_902_048),
+            "total-shares": Cl.uint(93_765_796_947),
+          })),
+        }), { status: 200 });
+      }
+      if (url.includes("/get-debt-params")) {
+        return new Response(JSON.stringify({
+          okay: true,
+          result: cvToHex(Cl.tuple({
+            "open-interest": Cl.uint(43_157_180_372),
+            "total-debt-shares": Cl.uint(29_032_383_023),
+          })),
+        }), { status: 200 });
+      }
+      if (url.includes("/get-protocol-reserve-percentage")) {
+        return new Response(JSON.stringify({
+          okay: true,
+          result: cvToHex(Cl.uint(25_000_000)),
+        }), { status: 200 });
+      }
+      if (url.includes("/get-ir")) {
+        return new Response(JSON.stringify({
+          okay: true,
+          result: cvToHex(responseOkCV(uintCV(17_247_758_733))),
+        }), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    const catalog = new MainnetYieldMarketCatalog(
+      async () => graniteManifest,
+      new StacksReadOnlyClient("https://stacks.test", request),
+      "https://bitflow.invalid",
+      request,
+      () => new Date("2026-09-15T08:00:00.000Z"),
+    );
+
+    await expect(catalog.discover()).resolves.toContainEqual(expect.objectContaining({
+      id: `granite:${state}`,
+      protocol: "granite",
+      assets: "gUSDC / aeUSDC",
+      annualizedRateBps: 129,
+      rateLabel: "Supply APR",
+      evidenceState: "verified",
+      observedAtBlock: 9_100_000,
+      tvlUsd: "97730.90",
+      eligibleForAllocation: false,
+      source: "SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.linear-kinked-ir-v1",
+      meaning: expect.stringContaining("linear-kinked-ir-v1.get-ir"),
+    }));
+  });
+
   it("maps current receipt-token rates while keeping earned-to-date withheld", () => {
     const position: Position = {
       id: "hermetica:susdh:wallet",

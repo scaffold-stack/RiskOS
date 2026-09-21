@@ -14,6 +14,7 @@ const runtimeConfigSchema = z.object({
   BITFLOW_APP_API_URL: z.string().url().default("https://bff.bitflowapis.finance/api/app"),
   BITFLOW_QUOTES_API_URL: z.string().url().default("https://bff.bitflowapis.finance/api/quotes"),
   HERMETICA_API_URL: z.string().url().default("https://app.hermetica.fi"),
+  STACKINGDAO_API_URL: z.string().url().default("https://app.stackingdao.com"),
   DEFILLAMA_YIELDS_API_URL: z.string().url().default("https://yields.llama.fi/pools"),
   SBTC_EMILY_URL: z.string().url().default("https://sbtc-emily.com"),
   BITCOIN_ESPLORA_URL: z.string().url().default("https://mempool.space/api"),
@@ -21,6 +22,12 @@ const runtimeConfigSchema = z.object({
   DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   CHAINHOOK_BEARER_TOKEN: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
   OPERATIONS_BEARER_TOKEN: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
+  ADMIN_PASSWORD_SCRYPT: z.preprocess(
+    emptyToUndefined,
+    z.string().regex(/^scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9_-]+\$[A-Za-z0-9_-]+$/).optional(),
+  ),
+  ANALYTICS_HASH_SALT: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
+  HIRO_CHAINHOOK_UUID: z.preprocess(emptyToUndefined, z.string().uuid().optional()),
   HIRO_API_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   PYTH_HERMES_URL: z.string().url().default("https://pyth.dourolabs.app/hermes"),
   PYTH_HERMES_TOKEN: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
@@ -29,6 +36,12 @@ const runtimeConfigSchema = z.object({
   COINBASE_EXCHANGE_API_URL: z.string().url().default("https://api.exchange.coinbase.com"),
   PRICE_MAX_DIVERGENCE_BPS: z.coerce.number().int().min(1).max(2_000).default(150),
   PUBLIC_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(60),
+  CHAINHOOK_BODY_LIMIT_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024 * 1024)
+    .max(64 * 1024 * 1024)
+    .default(32 * 1024 * 1024),
   REGISTRY_TRUSTED_KEY_FINGERPRINTS: z.preprocess(emptyToUndefined, z.string().optional()),
   REGISTRY_CANDIDATE_PATH: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   REGISTRY_SIGNED_PATH: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
@@ -52,6 +65,9 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv): RuntimeConfig
   }
   if (config.NODE_ENV === "production" && !config.OPERATIONS_BEARER_TOKEN) {
     throw new Error("Production requires OPERATIONS_BEARER_TOKEN for reconciliation controls");
+  }
+  if (config.ADMIN_PASSWORD_SCRYPT && !config.ANALYTICS_HASH_SALT) {
+    throw new Error("ADMIN_PASSWORD_SCRYPT requires ANALYTICS_HASH_SALT for privacy-preserving address analytics");
   }
   if (config.NODE_ENV === "production" && !config.REGISTRY_TRUSTED_KEY_FINGERPRINTS) {
     throw new Error("Production requires REGISTRY_TRUSTED_KEY_FINGERPRINTS for registry activation");

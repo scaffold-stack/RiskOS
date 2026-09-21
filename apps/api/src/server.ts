@@ -16,6 +16,7 @@ import {
 } from "../../../packages/data-foundation/src/index.js";
 import { PostgresProductStore } from "../../../packages/workflows/src/index.js";
 import { PostgresCommercialStore } from "../../../packages/commercial/src/index.js";
+import { PostgresAdminAnalyticsStore } from "../../../packages/operations/src/index.js";
 
 const config = loadRuntimeConfig(process.env);
 const sql = config.DATABASE_URL ? postgres(config.DATABASE_URL, { max: 10, idle_timeout: 20 }) : undefined;
@@ -62,6 +63,7 @@ const app = await buildApp({
   bitflowAppApiUrl: config.BITFLOW_APP_API_URL,
   bitflowQuotesApiUrl: config.BITFLOW_QUOTES_API_URL,
   hermeticaApiUrl: config.HERMETICA_API_URL,
+  stackingDaoApiUrl: config.STACKINGDAO_API_URL,
   defiLlamaYieldsApiUrl: config.DEFILLAMA_YIELDS_API_URL,
   sbtcEmilyUrl: config.SBTC_EMILY_URL,
   bitcoinEsploraUrl: config.BITCOIN_ESPLORA_URL,
@@ -70,6 +72,9 @@ const app = await buildApp({
   ...(dataFoundation ? { dataFoundation } : {}),
   ...(config.CHAINHOOK_BEARER_TOKEN ? { chainhookBearerToken: config.CHAINHOOK_BEARER_TOKEN } : {}),
   ...(config.OPERATIONS_BEARER_TOKEN ? { operationsBearerToken: config.OPERATIONS_BEARER_TOKEN } : {}),
+  ...(config.ADMIN_PASSWORD_SCRYPT ? { adminPasswordVerifier: config.ADMIN_PASSWORD_SCRYPT } : {}),
+  ...(config.ANALYTICS_HASH_SALT ? { analyticsHashSalt: config.ANALYTICS_HASH_SALT } : {}),
+  ...(config.HIRO_CHAINHOOK_UUID ? { hiroChainhookUuid: config.HIRO_CHAINHOOK_UUID } : {}),
   ...(dataFoundation ? { reconciler: new StacksBlockReconciler(dataFoundation, config.STACKS_API_URL, fetch, config.HIRO_API_KEY) } : {}),
   ...(config.HIRO_API_KEY ? { hiroApiKey: config.HIRO_API_KEY } : {}),
   ...(config.PYTH_HERMES_TOKEN ? {
@@ -78,12 +83,14 @@ const app = await buildApp({
   } : {}),
   priceMaximumDivergenceBps: config.PRICE_MAX_DIVERGENCE_BPS,
   publicRateLimitPerMinute: config.PUBLIC_RATE_LIMIT_PER_MINUTE,
+  chainhookBodyLimitBytes: config.CHAINHOOK_BODY_LIMIT_BYTES,
   coinGeckoApiUrl: config.COINGECKO_API_URL,
   coinbaseExchangeApiUrl: config.COINBASE_EXCHANGE_API_URL,
   ...(config.COINGECKO_DEMO_API_KEY ? { coinGeckoDemoApiKey: config.COINGECKO_DEMO_API_KEY } : {}),
   ...(registryStore ? { registryStore } : {}),
   ...(sql ? { productStore: new PostgresProductStore(sql) } : {}),
   ...(sql ? { commercialStore: new PostgresCommercialStore(sql) } : {}),
+  ...(sql ? { adminAnalyticsStore: new PostgresAdminAnalyticsStore(sql) } : {}),
   authAudience: config.WEB_ORIGIN?.split(",")[0] ?? "http://localhost:5173",
   registryVerifier: new ContractRegistryVerifier(config.STACKS_API_URL, fetch, config.HIRO_API_KEY),
   ...(trustedFingerprints ? { trustedRegistryKeyFingerprints: trustedFingerprints } : {}),

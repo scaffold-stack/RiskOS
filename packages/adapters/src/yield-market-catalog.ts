@@ -1,3 +1,4 @@
+import { uintCV } from "@stacks/transactions";
 import { z } from "zod";
 import { asBool, asTuple, asUint, tupleField, unwrapOk } from "./clarity-values.js";
 import type { Position } from "../../domain/src/index.js";
@@ -62,6 +63,22 @@ const hermeticaTvlSchema = z
   .object({ tvl: numericStringSchema.refine((value) => value >= 0) })
   .passthrough();
 
+const stackingDaoApySchema = z
+  .object({
+    ststx: z.number().finite().nonnegative().max(100),
+    ststxbtc: z.number().finite().nonnegative().max(100),
+    stbtc: z.number().finite().nonnegative().max(100),
+    stx: z.number().finite().nonnegative().max(100).optional(),
+  })
+  .passthrough();
+const stackingDaoStatsSchema = z
+  .object({
+    stStxSupply: z.number().finite().nonnegative().optional(),
+    stStxBtcSupply: z.number().finite().nonnegative().optional(),
+    stBtcSupply: z.number().finite().nonnegative().optional(),
+  })
+  .passthrough();
+
 const defiLlamaPoolSchema = z.object({
   pool: z.string().uuid(),
   chain: z.literal("Stacks"),
@@ -102,8 +119,19 @@ const ZEST_STRATEGY_BASELINE_AT = "2026-09-02T14:03:20.000Z";
 const ZEST_STRATEGY_BASELINE_PRICE = 100_000_000n;
 const ZEST_STRATEGY_BASELINE_TX = "0x12c2de7ebf06da2ff93bc82dbbffb37ea8b6efeb0e61c33a3288b9dae05fa0c1";
 const SECONDS_PER_YEAR = 31_536_000;
+/** Granite's published interest-rate module (same deployer as registry state-v1). */
+const GRANITE_IR_MODULE = "SP35E2BBMDT2Y1HB0NTK139YBGYV3PAPK3WA8BRNA.linear-kinked-ir-v1";
+const GRANITE_ONE_8 = 100_000_000n;
+const GRANITE_ONE_12 = 1_000_000_000_000n;
+const GRANITE_AEUSDC_DECIMALS = 6;
 
 const EARNING_PROTOCOLS = new Set(["zest-v2", "bitflow", "hermetica", "granite", "stackingdao", "stacking-dao"]);
+
+function normalizeEarningProtocol(protocol: string): string {
+  if (protocol === "zest-v2") return "zest";
+  if (protocol === "stacking-dao") return "stackingdao";
+  return protocol;
+}
 
 export class MainnetYieldMarketCatalog {
   constructor(
@@ -114,6 +142,7 @@ export class MainnetYieldMarketCatalog {
     private readonly now: () => Date = () => new Date(),
     private readonly hermeticaApiUrl = "https://app.hermetica.fi",
     private readonly defiLlamaYieldsApiUrl = "https://yields.llama.fi/pools",
+    private readonly stackingDaoApiUrl = "https://app.stackingdao.com",
   ) {}
 
   async discover(): Promise<YieldMarket[]> {
@@ -129,9 +158,14 @@ export class MainnetYieldMarketCatalog {
       (value) => ({ status: "fulfilled" as const, value }),
       (reason) => ({ status: "rejected" as const, reason }),
     );
-    const [bitflow, hermetica, independentZest] = await Promise.allSettled([
+    const granite = await this.graniteMarkets(manifest).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason) => ({ status: "rejected" as const, reason }),
+    );
+    const [bitflow, hermetica, stackingdao, independentZest] = await Promise.allSettled([
       this.bitflowMarkets(manifest),
       this.hermeticaMarkets(manifest),
+      this.stackingDaoMarkets(manifest),
       this.independentZestMarkets(),
     ]);
     const zestMarkets = zest.status === "fulfilled"
@@ -140,8 +174,10 @@ export class MainnetYieldMarketCatalog {
     const markets = [
       ...zestMarkets,
       ...(zestStrategy.status === "fulfilled" && zestStrategy.value ? [zestStrategy.value] : []),
+      ...(granite.status === "fulfilled" ? granite.value : []),
       ...(bitflow.status === "fulfilled" ? bitflow.value : []),
       ...(hermetica.status === "fulfilled" ? hermetica.value : []),
+      ...(stackingdao.status === "fulfilled" ? stackingdao.value : []),
     ];
     const represented = new Set(markets.map((market) => market.protocol));
     for (const protocol of new Set(
@@ -149,7 +185,7 @@ export class MainnetYieldMarketCatalog {
         .filter((entry) => entry.enabled && EARNING_PROTOCOLS.has(entry.protocol))
         .map((entry) => entry.protocol),
     )) {
-      const normalized = protocol === "zest-v2" ? "zest" : protocol;
+      const normalized = normalizeEarningProtocol(protocol);
       if (represented.has(normalized)) continue;
       const assets = [
         ...new Set(
@@ -161,10 +197,10 @@ export class MainnetYieldMarketCatalog {
       markets.push({
         id: `coverage:${normalized}`,
         protocol: normalized,
-        kind: protocol === "stackingdao" || protocol === "stacking-dao" ? "stacking" : "lending",
+        kind: normalized === "stackingdao" ? "stacking" : "lending",
         assets: assets.join(" / ") || "Registry-approved markets",
         annualizedRateBps: null,
-        rateLabel: protocol === "stackingdao" || protocol === "stacking-dao" ? "Reward APY" : "Supply APR",
+        rateLabel: normalized === "stackingdao" ? "Reward APY" : "Supply APR",
         evidenceState: "unavailable",
         confidenceScore: 0,
         observedAtBlock: null,
@@ -384,6 +420,210 @@ export class MainnetYieldMarketCatalog {
     });
   }
 
+  private async stackingDaoMarkets(
+    manifest: NonNullable<Awaited<ReturnType<RegistryManifestProvider>>>,
+  ): Promise<YieldMarket[]> {
+    const entries = enabledProtocolEntries(manifest, "stackingdao");
+    if (entries.length === 0) return [];
+    const observedAt = this.now().toISOString();
+    const baseUrl = this.stackingDaoApiUrl.replace(/\/$/, "");
+    const apySource = `${baseUrl}/api/apy?v=2`;
+    const approved = new Set(entries.flatMap((entry) => entry.supportedAssets.map((asset) => asset.toLowerCase())));
+    try {
+      const headers = { accept: "application/json", "user-agent": "riskos/0.1-yield-catalog" };
+      const [apyResponse, statsResponse] = await Promise.all([
+        this.request(apySource, { headers, signal: AbortSignal.timeout(8_000) }),
+        this.request(`${baseUrl}/api/protocol-stats`, { headers, signal: AbortSignal.timeout(8_000) }),
+      ]);
+      if (!apyResponse.ok) throw new Error(`APY endpoint returned HTTP ${apyResponse.status}`);
+      const apy = stackingDaoApySchema.parse(await apyResponse.json());
+      const stats = statsResponse.ok
+        ? stackingDaoStatsSchema.safeParse(await statsResponse.json())
+        : null;
+      const products: Array<{
+        id: string;
+        asset: string;
+        field: keyof typeof apy;
+        rate: number;
+        rewardAsset: string;
+        supplyHint?: number;
+      }> = [
+        {
+          id: "stackingdao:ststx",
+          asset: "stSTX",
+          field: "ststx",
+          rate: apy.ststx,
+          rewardAsset: "STX",
+          ...(stats?.success && stats.data.stStxSupply !== undefined
+            ? { supplyHint: stats.data.stStxSupply }
+            : {}),
+        },
+        {
+          id: "stackingdao:ststxbtc",
+          asset: "stSTXbtc",
+          field: "ststxbtc",
+          rate: apy.ststxbtc,
+          rewardAsset: "sBTC",
+          ...(stats?.success && stats.data.stStxBtcSupply !== undefined
+            ? { supplyHint: stats.data.stStxBtcSupply }
+            : {}),
+        },
+        {
+          id: "stackingdao:stbtc",
+          asset: "stBTC",
+          field: "stbtc",
+          rate: apy.stbtc,
+          rewardAsset: "sBTC",
+          ...(stats?.success && stats.data.stBtcSupply !== undefined
+            ? { supplyHint: stats.data.stBtcSupply }
+            : {}),
+        },
+      ];
+      return products
+        .filter((product) => approved.has(product.asset.toLowerCase()))
+        .map((product): YieldMarket => ({
+          id: product.id,
+          protocol: "stackingdao",
+          kind: "stacking",
+          assets: product.asset,
+          annualizedRateBps: Math.round(product.rate * 100),
+          rateLabel: "Reward APY",
+          evidenceState: "provider-reported",
+          confidenceScore: 0.76,
+          observedAtBlock: null,
+          observedAt,
+          tvlUsd: null,
+          independentRateEvidence: null,
+          capacityEvidence: null,
+          source: apySource,
+          meaning:
+            `StackingDAO's official app endpoint reports ${product.rate.toFixed(2)}% projected ${product.asset} APY ` +
+            `(reward asset ${product.rewardAsset}; field ${product.field}). ` +
+            `This is estimated annual yield from the protocol, not trailing realized return` +
+            (product.supplyHint !== undefined
+              ? `; protocol-stats reports circulating supply ≈ ${product.supplyHint}`
+              : "") +
+            `. Cache may be up to 30 minutes.`,
+          eligibleForAllocation: false,
+        }));
+    } catch (error) {
+      return [{
+        id: "coverage:stackingdao",
+        protocol: "stackingdao",
+        kind: "stacking",
+        assets: [...new Set(entries.flatMap((entry) => entry.supportedAssets))].join(" / ") || "stSTX / stBTC / stSTXbtc",
+        annualizedRateBps: null,
+        rateLabel: "Reward APY",
+        evidenceState: "unavailable",
+        confidenceScore: 0,
+        observedAtBlock: null,
+        observedAt,
+        tvlUsd: null,
+        independentRateEvidence: null,
+        capacityEvidence: null,
+        source: apySource,
+        meaning: `Current StackingDAO APY evidence is unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+        eligibleForAllocation: false,
+      }];
+    }
+  }
+
+  private async graniteMarkets(
+    manifest: NonNullable<Awaited<ReturnType<RegistryManifestProvider>>>,
+  ): Promise<YieldMarket[]> {
+    const state = enabledProtocolEntries(manifest, "granite").find((entry) =>
+      entry.contractPrincipal.endsWith(".state-v1"),
+    );
+    if (!state) return [];
+    const observedAt = this.now().toISOString();
+    try {
+      const missing = ["get-lp-params", "get-debt-params"].filter(
+        (name) => !state.readOnlyFunctions.includes(name),
+      );
+      if (missing.length > 0) {
+        throw new Error(`registry does not authorize ${missing.join(", ")} on ${state.contractPrincipal}`);
+      }
+      const pinned = await this.stacks.pinTip();
+      const lpParams = asTuple(await pinned.call(state.contractPrincipal, "get-lp-params", []));
+      const debtParams = asTuple(await pinned.call(state.contractPrincipal, "get-debt-params", []));
+      const totalAssets = asUint(tupleField(lpParams, "total-assets"));
+      const openInterest = asUint(tupleField(debtParams, "open-interest"));
+      let reserveFactor = GRANITE_ONE_8 / 4n; // official config default 25% if getter unavailable
+      try {
+        reserveFactor = asUint(await pinned.call(state.contractPrincipal, "get-protocol-reserve-percentage", []));
+      } catch {
+        // Older registry snapshots may omit this getter; fall back to published config.
+      }
+      if (reserveFactor > GRANITE_ONE_8) throw new Error("Granite protocol reserve exceeds 100%");
+      const irResponse = await pinned.call(GRANITE_IR_MODULE, "get-ir", [
+        uintCV(totalAssets),
+        uintCV(openInterest),
+      ]);
+      const borrowRate12 = asUint(unwrapOk(irResponse));
+      // get-ir returns an annual rate in 12-fixed precision.
+      const borrowAprBps = Number((borrowRate12 * 10_000n) / GRANITE_ONE_12);
+      const supplyAprBps = Number(
+        (borrowRate12 * (GRANITE_ONE_8 - reserveFactor) * 10_000n) / (GRANITE_ONE_12 * GRANITE_ONE_8),
+      );
+      if (!Number.isSafeInteger(borrowAprBps) || !Number.isSafeInteger(supplyAprBps)) {
+        throw new Error("Granite annualized rates exceed safe integer bounds");
+      }
+      if (supplyAprBps < 0 || supplyAprBps > 100_000) {
+        throw new Error(`Granite supply APR ${supplyAprBps} bps is outside integrity bounds`);
+      }
+      const utilizationBps = totalAssets === 0n
+        ? 0
+        : Number((openInterest * 10_000n) / totalAssets);
+      const tvlUsd = (Number(totalAssets) / 10 ** GRANITE_AEUSDC_DECIMALS).toFixed(2);
+      const reservePct = Number(reserveFactor) / Number(GRANITE_ONE_8) * 100;
+      return [{
+        id: `granite:${state.contractPrincipal}`,
+        protocol: "granite",
+        kind: "lending",
+        assets: "gUSDC / aeUSDC",
+        annualizedRateBps: supplyAprBps,
+        rateLabel: "Supply APR",
+        evidenceState: "verified",
+        confidenceScore: 0.9,
+        observedAtBlock: pinned.blockHeight,
+        observedAt,
+        tvlUsd,
+        independentRateEvidence: null,
+        capacityEvidence: {
+          source: `${state.contractPrincipal}#get-lp-params`,
+          observedAt,
+          tvlUsd,
+        },
+        source: GRANITE_IR_MODULE,
+        meaning:
+          `Supply APR reconstructed from Granite's official linear-kinked-ir-v1.get-ir at Stacks block ${pinned.blockHeight}: ` +
+          `borrow ${borrowAprBps} bps × (1 − ${reservePct.toFixed(0)}% protocol reserve) with utilization ${utilizationBps} bps. ` +
+          `LP capacity uses get-lp-params total-assets as aeUSDC (≈ $${tvlUsd}). ` +
+          `No independent HTTP rate feed is published; recommend mode still requires a separate corroborating source.`,
+        eligibleForAllocation: false,
+      }];
+    } catch (error) {
+      return [{
+        id: `granite:${state.contractPrincipal}`,
+        protocol: "granite",
+        kind: "lending",
+        assets: "gUSDC / aeUSDC",
+        annualizedRateBps: null,
+        rateLabel: "Supply APR",
+        evidenceState: "unavailable",
+        confidenceScore: 0,
+        observedAtBlock: null,
+        observedAt,
+        tvlUsd: null,
+        independentRateEvidence: null,
+        capacityEvidence: null,
+        source: GRANITE_IR_MODULE,
+        meaning: `Current Granite market rate evidence is unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+        eligibleForAllocation: false,
+      }];
+    }
+  }
+
   private async hermeticaMarkets(manifest: NonNullable<Awaited<ReturnType<RegistryManifestProvider>>>): Promise<YieldMarket[]> {
     const entries = enabledProtocolEntries(manifest, "hermetica");
     if (!entries.some((entry) => entry.supportedAssets.includes("sUSDh"))) return [];
@@ -562,6 +802,12 @@ export function applyYieldMarketRatesToPositions(
         (candidate.evidenceState === "provider-reported" && candidate.confidenceScore >= 0.75);
       if (!acceptedEvidence) return false;
       if (protocol === "hermetica") return symbol === "susdh" && candidate.id === "hermetica:susdh";
+      if (protocol === "stackingdao" || protocol === "stacking-dao") {
+        return candidate.assets.split("/").map((asset) => asset.trim().toLowerCase()).includes(symbol);
+      }
+      if (protocol === "granite") {
+        return symbol === "gusdc" || candidate.assets.toLowerCase().includes(symbol);
+      }
       const marketAssets = candidate.assets
         .split("/")
         .map((asset) => asset.trim().toLowerCase());

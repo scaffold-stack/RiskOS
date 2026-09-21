@@ -1,6 +1,11 @@
 import { ClarityType, hexToCV, type ClarityValue } from "@stacks/transactions";
 import { createHash } from "node:crypto";
-import type { IngestedBlock, IngestedContractEvent, IngestedTransaction } from "./chainhook.js";
+import type {
+  ChainhookBatch,
+  IngestedBlock,
+  IngestedContractEvent,
+  IngestedTransaction,
+} from "./chainhook.js";
 import { canonicalJson } from "./canonical-json.js";
 import type { RegistryManifest } from "./registry.js";
 
@@ -23,6 +28,81 @@ export function isProjectionBackfillContract(entry: RegistryManifest["entries"][
 
 export function projectionBackfillContracts(manifest: RegistryManifest): RegistryManifest["entries"] {
   return manifest.entries.filter(isProjectionBackfillContract);
+}
+
+/**
+ * Keeps canonical block continuity while discarding unrelated full-block
+ * operations before persistence. The original delivery digest remains on the
+ * batch, but raw storage receives only this deterministic compact summary.
+ */
+export function compactChainhookBatch(
+  batch: ChainhookBatch,
+  manifest: RegistryManifest | null,
+): ChainhookBatch {
+  const projectionEntries = manifest ? projectionBackfillContracts(manifest) : [];
+  const contracts = new Set(projectionEntries.map((entry) => entry.contractPrincipal));
+  const bitflowAssets = new Set(
+    projectionEntries
+      .filter((entry) => entry.protocol === "bitflow")
+      .map((entry) => `${entry.contractPrincipal}::pool-token-id`),
+  );
+  const compactBlocks = (blocks: IngestedBlock[], retainEvents: boolean) =>
+    blocks.map((block) => {
+      const transactions = retainEvents
+        ? block.transactions
+            .map((transaction) => {
+              const events = transaction.events.filter((event) => {
+                const eventType = event.eventType.toLowerCase();
+                const asset = assetIdentifier(event);
+                const relevantContractLog =
+                  event.contractIdentifier !== null &&
+                  contracts.has(event.contractIdentifier) &&
+                  eventType.includes("contract_log");
+                const relevantBitflowOwnership =
+                  asset !== null && bitflowAssets.has(asset) && eventType.includes("nft");
+                return relevantContractLog || relevantBitflowOwnership;
+              });
+              return {
+                ...transaction,
+                raw: {
+                  compacted: true,
+                  txId: transaction.txId,
+                  retainedEventCount: events.length,
+                },
+                events,
+              };
+            })
+            .filter((transaction) => transaction.events.length > 0)
+        : [];
+      return { ...block, transactions };
+    });
+  const apply = compactBlocks(batch.apply, true);
+  const rollback = compactBlocks(batch.rollback, false);
+  return {
+    ...batch,
+    payload: {
+      compacted: true,
+      eventKey: batch.eventKey,
+      source: batch.source,
+      network: batch.network,
+      originalPayloadSha256: batch.payloadSha256,
+      apply: apply.map((block) => ({
+        height: block.height,
+        indexBlockHash: block.indexBlockHash,
+        retainedTransactions: block.transactions.length,
+        retainedEvents: block.transactions.reduce(
+          (total, transaction) => total + transaction.events.length,
+          0,
+        ),
+      })),
+      rollback: rollback.map((block) => ({
+        height: block.height,
+        indexBlockHash: block.indexBlockHash,
+      })),
+    },
+    apply,
+    rollback,
+  };
 }
 
 export interface ProtocolProjection {

@@ -3,7 +3,10 @@ import { resolve } from "node:path";
 import postgres from "postgres";
 import { parseChainhookPayload } from "../packages/data-foundation/src/chainhook.js";
 import { PostgresDataFoundationStore } from "../packages/data-foundation/src/postgres-store.js";
-import { projectionBackfillContracts } from "../packages/data-foundation/src/protocol-projection.js";
+import {
+  compactChainhookBatch,
+  projectionBackfillContracts,
+} from "../packages/data-foundation/src/protocol-projection.js";
 import { unwrapRegistryPayload } from "../packages/data-foundation/src/registry.js";
 
 type Json = Record<string, unknown>;
@@ -31,6 +34,8 @@ const pagePrefetch = integerEnv("BACKFILL_PAGE_PREFETCH", 8, 1, 32);
 const contractConcurrency = integerEnv("BACKFILL_CONTRACT_CONCURRENCY", 2, 1, 4);
 const pageDelayMs = integerEnv("BACKFILL_PAGE_DELAY_MS", 0, 0, 5_000);
 const untilExhausted = process.env.BACKFILL_UNTIL_EXHAUSTED === "1";
+const maxDatabaseBytes = BigInt(process.env.BACKFILL_MAX_DATABASE_BYTES ?? "0");
+if (maxDatabaseBytes < 0n) throw new Error("BACKFILL_MAX_DATABASE_BYTES must be zero or greater");
 const selectedContracts = new Set(
   (process.env.BACKFILL_CONTRACTS ?? "").split(",").map((value) => value.trim()).filter(Boolean),
 );
@@ -165,7 +170,19 @@ const entries = projectionEntries
       a.activationBlock - b.activationBlock || a.contractPrincipal.localeCompare(b.contractPrincipal),
   );
 if (entries.length === 0) throw new Error("No projection-capable registry contracts matched BACKFILL_CONTRACTS");
-console.error(JSON.stringify({ stacksBases, preferReference, pagePrefetch, concurrency, maxPagesPerContract }));
+console.error(JSON.stringify({
+  stacksBases: stacksBases.map((base) => {
+    try {
+      return new URL(base).origin;
+    } catch {
+      return "[invalid-provider-url]";
+    }
+  }),
+  preferReference,
+  pagePrefetch,
+  concurrency,
+  maxPagesPerContract,
+}));
 
 const blockCache = new Map<number, Json>();
 const txCache = new Map<string, Json>();
@@ -317,6 +334,34 @@ function synthesizeTransactions(events: Json[], known: Map<string, Json>): Json[
 
 const runSummary: Array<Record<string, unknown>> = [];
 const failures: string[] = [];
+let capacityReached = false;
+
+async function pauseAtStorageCeiling(
+  contractPrincipal: string,
+  offset: number,
+): Promise<boolean> {
+  if (maxDatabaseBytes === 0n) return false;
+  const [row] = await sql`SELECT pg_database_size(current_database()) AS size_bytes`;
+  const sizeBytes = BigInt(String(row?.size_bytes ?? 0));
+  if (sizeBytes < maxDatabaseBytes) return false;
+  const detail =
+    `Paused at database storage ceiling ${maxDatabaseBytes.toString()} bytes; ` +
+    `current size ${sizeBytes.toString()} bytes; resume from offset ${offset}`;
+  await sql`
+    UPDATE registry_backfill_checkpoints
+    SET status = 'paused', last_error = ${detail}, completed_at = NULL, updated_at = now()
+    WHERE network = ${network} AND registry_version = ${manifest.version}
+      AND contract_principal = ${contractPrincipal}
+  `;
+  capacityReached = true;
+  runSummary.push({
+    contract: contractPrincipal,
+    status: "paused",
+    next_offset: offset,
+    detail,
+  });
+  return true;
+}
 
 async function backfillContract(entry: (typeof entries)[number]) {
   await sql`
@@ -349,6 +394,7 @@ async function backfillContract(entry: (typeof entries)[number]) {
 
   try {
     while (pages < maxPagesPerContract) {
+      if (await pauseAtStorageCeiling(entry.contractPrincipal, offset)) return;
       const windowSize = Math.min(pagePrefetch, maxPagesPerContract - pages);
       const pageOffsets = Array.from({ length: windowSize }, (_, index) => offset + index * pageSize);
       const fetched = await mapLimit(pageOffsets, Math.min(concurrency, pageOffsets.length), async (pageOffset) => {
@@ -426,11 +472,11 @@ async function backfillContract(entry: (typeof entries)[number]) {
             rollback: [],
             apply: [chainhookBlock(block, blockTransactions)],
           };
-          const batch = parseChainhookPayload(payload, {
+          const parsedBatch = parseChainhookPayload(payload, {
             network,
             source: `hiro-contract-backfill:${entry.contractPrincipal}`,
-            deliveryId: `${manifest.version}:${entry.contractPrincipal}:${useSynthetic ? "synth" : "full"}:${offset}:${height}:${String(block.index_block_hash)}`,
           });
+          const batch = compactChainhookBatch(parsedBatch, manifest);
           await store.ingest(batch, manifest);
         }
 
@@ -563,7 +609,7 @@ try {
         AND status <> 'complete'
       ORDER BY contract_principal
     `;
-    if (!untilExhausted || incomplete.length === 0) {
+    if (!untilExhausted || incomplete.length === 0 || capacityReached) {
       const projectionCounts = await sql`
         SELECT protocol, count(*)::integer AS count FROM protocol_projection_events
         WHERE network = ${network} AND canonical GROUP BY protocol ORDER BY protocol
@@ -586,6 +632,7 @@ try {
             projectionCounts,
             issues,
             failures,
+            capacityReached,
           },
           null,
           2,
